@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.venv/
 
 # Virtual Environment
 venv/
@@ -35,6 +36,7 @@ ENV/
 .cursorrules
 .cursorignore
 .cursorindexingignore
+.history/
 
 # OS
 .DS_Store
@@ -65,3 +67,8 @@ outputs/
 
 # Alembic (keep migration files, but ignore generated/cache files)
 app/backend/alembic/versions/__pycache__/
+
+# Random
+business.md
+.cursor
+.history/*
