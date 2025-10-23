@@ -324,6 +324,30 @@ def get_market_cap(
     return market_cap
 
 
+def get_company_facts(
+    ticker: str,
+    api_key: str | None = None,
+):
+    """Fetch company facts (sector, industry, name, market cap, etc.).
+
+    Returns CompanyFacts or None on failure.
+    """
+    headers = {}
+    financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
+    if financial_api_key:
+        headers["X-API-KEY"] = financial_api_key
+
+    url = f"https://api.financialdatasets.ai/company/facts/?ticker={ticker}"
+    response = _make_api_request(url, headers)
+    if response.status_code != 200:
+        print(f"Error fetching company facts: {ticker} - {response.status_code}")
+        return None
+
+    data = response.json()
+    response_model = CompanyFactsResponse(**data)
+    return response_model.company_facts
+
+
 def prices_to_df(prices: list[Price]) -> pd.DataFrame:
     """Convert prices to a DataFrame."""
     df = pd.DataFrame([p.model_dump() for p in prices])

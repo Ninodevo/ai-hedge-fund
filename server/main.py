@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from server.personas import PERSONA_PROMPTS, DEFAULT_PERSONA
 # NOTE: Avoid importing heavy modules at startup; import inside functions when needed
+from server.collectors import collect_enriched_stock
 
 API_KEY = os.getenv("ENGINE_API_KEY", "changeme")
 app = FastAPI(title="Stocklytic Engine")
@@ -22,6 +23,7 @@ class ReportPayload(BaseModel):
     include_backtest: bool = False
     backtest_start: Optional[str] = None
     backtest_end: Optional[str] = None
+    months_back: Optional[int] = 12
 
 @app.get("/health")
 def health(): return {"ok": True}
@@ -31,10 +33,10 @@ def generate_report(p: ReportPayload, authorization: Optional[str] = Header(None
     _require(authorization)
     symbol  = p.symbol.upper()
     persona = (p.persona or DEFAULT_PERSONA).lower()
-    return _build_report(symbol, persona)
+    return _build_report(symbol, persona, p.months_back)
 
 
-def _build_report(symbol: str, persona: str) -> dict:
+def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12) -> dict:
     # Local imports to avoid startup errors if optional deps aren't installed yet
     from src.main import run_hedge_fund
     from src.utils.analysts import ANALYST_CONFIG
@@ -79,10 +81,18 @@ def _build_report(symbol: str, persona: str) -> dict:
 
     summary = result.get("decisions")
 
+    # Enriched fundamentals/valuation/volatility block
+    # enriched = collect_enriched_stock(symbol, months_back or 12)
+    # TODO: Implement this, commented out to avoid billing
+    enriched = {
+
+    }
+
     return {
         "symbol": symbol,
         "persona": persona,
         "summary": summary,
+        "enriched": enriched,
         "backtest": None,
         "disclaimer": (
             "AI-generated content for educational and informational purposes only. "
