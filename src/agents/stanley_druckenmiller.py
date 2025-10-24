@@ -150,6 +150,24 @@ def stanley_druckenmiller_agent(state: AgentState, agent_id: str = "stanley_druc
 
         progress.update_status(agent_id, ticker, "Done", analysis=druck_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "growth_momentum", "detail": _split_details_to_list(growth_momentum_analysis.get("details"))},
+            {"label": "risk_reward", "detail": _split_details_to_list(risk_reward_analysis.get("details"))},
+            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
+            {"label": "sentiment", "detail": _split_details_to_list(sentiment_analysis.get("details"))},
+            {"label": "insider_activity", "detail": _split_details_to_list(insider_activity.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # Wrap results in a single message
     message = HumanMessage(content=json.dumps(druck_analysis), name=agent_id)
 

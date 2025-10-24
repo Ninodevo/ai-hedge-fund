@@ -112,6 +112,23 @@ def bill_ackman_agent(state: AgentState, agent_id: str = "bill_ackman_agent"):
         }
         
         progress.update_status(agent_id, ticker, "Done", analysis=ackman_output.reasoning)
+
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "business_quality", "detail": _split_details_to_list(quality_analysis.get("details"))},
+            {"label": "financial_discipline", "detail": _split_details_to_list(balance_sheet_analysis.get("details"))},
+            {"label": "activism_potential", "detail": _split_details_to_list(activism_analysis.get("details"))},
+            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
     
     # Wrap results in a single message for the chain
     message = HumanMessage(

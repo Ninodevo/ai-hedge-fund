@@ -96,6 +96,23 @@ def cathie_wood_agent(state: AgentState, agent_id: str = "cathie_wood_agent"):
 
         progress.update_status(agent_id, ticker, "Done", analysis=cw_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            items = []
+            if not val:
+                return items
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "disruptive_potential", "detail": _split_details_to_list(disruptive_analysis.get("details"))},
+            {"label": "innovation_growth", "detail": _split_details_to_list(innovation_analysis.get("details"))},
+            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     message = HumanMessage(content=json.dumps(cw_analysis), name=agent_id)
 
     if state["metadata"].get("show_reasoning"):

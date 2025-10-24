@@ -140,6 +140,29 @@ def fundamentals_analyst_agent(state: AgentState, agent_id: str = "fundamentals_
             "reasoning": reasoning,
         }
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            items = []
+            if not val:
+                return items
+            s = str(val)
+            # split on ';' then on ',' for finer granularity
+            parts = []
+            for seg in s.split(";"):
+                parts.extend(seg.split(","))
+            return [p.strip() for p in parts if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "profitability", "detail": _split_details_to_list(reasoning.get("profitability_signal", {}).get("details"))},
+            {"label": "growth", "detail": _split_details_to_list(reasoning.get("growth_signal", {}).get("details"))},
+            {"label": "financial_health", "detail": _split_details_to_list(reasoning.get("financial_health_signal", {}).get("details"))},
+            {"label": "price_ratios", "detail": _split_details_to_list(reasoning.get("price_ratios_signal", {}).get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
 
     # Create the fundamental analysis message

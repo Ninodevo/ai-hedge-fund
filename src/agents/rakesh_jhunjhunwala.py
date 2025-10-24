@@ -147,6 +147,25 @@ def rakesh_jhunjhunwala_agent(state: AgentState, agent_id: str = "rakesh_jhunjhu
 
         progress.update_status(agent_id, ticker, "Done", analysis=jhunjhunwala_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "growth", "detail": _split_details_to_list(growth_analysis.get("details"))},
+            {"label": "profitability", "detail": _split_details_to_list(profitability_analysis.get("details"))},
+            {"label": "balance_sheet", "detail": _split_details_to_list(balancesheet_analysis.get("details"))},
+            {"label": "cash_flow", "detail": _split_details_to_list(cashflow_analysis.get("details"))},
+            {"label": "management", "detail": _split_details_to_list(management_analysis.get("details"))},
+            {"label": "intrinsic_value", "detail": _split_details_to_list(intrinsic_value_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # ─── Push message back to graph state ──────────────────────────────────────
     message = HumanMessage(content=json.dumps(jhunjhunwala_analysis), name=agent_id)
 

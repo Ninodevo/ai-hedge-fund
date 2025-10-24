@@ -205,6 +205,34 @@ def valuation_analyst_agent(state: AgentState, agent_id: str = "valuation_analys
             "confidence": confidence,
             "reasoning": reasoning,
         }
+
+        # Persist structured details for UI/debugging
+        def _split_lines(s: str | None) -> list[str]:
+            if not s:
+                return []
+            parts = []
+            for line in str(s).split("\n"):
+                for seg in line.split(","):
+                    seg = seg.strip()
+                    if seg:
+                        parts.append(seg)
+            return parts
+
+        structured_detail_items = [
+            {"label": "dcf", "detail": _split_lines(reasoning.get("dcf_analysis", {}).get("details") if isinstance(reasoning.get("dcf_analysis"), dict) else None)},
+            {"label": "owner_earnings", "detail": _split_lines(reasoning.get("owner_earnings_analysis", {}).get("details") if isinstance(reasoning.get("owner_earnings_analysis"), dict) else None)},
+            {"label": "ev_ebitda", "detail": _split_lines(reasoning.get("ev_ebitda_analysis", {}).get("details") if isinstance(reasoning.get("ev_ebitda_analysis"), dict) else None)},
+            {"label": "residual_income", "detail": _split_lines(reasoning.get("residual_income_analysis", {}).get("details") if isinstance(reasoning.get("residual_income_analysis"), dict) else None)},
+        ]
+
+        # Add scenario summary if present
+        if isinstance(reasoning.get("dcf_scenario_analysis"), dict):
+            scenario_text = ", ".join([f"{k}: {v}" for k, v in reasoning["dcf_scenario_analysis"].items()])
+            structured_detail_items.append({"label": "dcf_scenarios", "detail": _split_lines(scenario_text)})
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
 
     # ---- Emit message (for LLM tool chain) ----

@@ -125,6 +125,30 @@ def aswath_damodaran_agent(state: AgentState, agent_id: str = "aswath_damodaran_
 
         progress.update_status(agent_id, ticker, "Done", analysis=damodaran_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            items: list[str] = []
+            if val is None:
+                return items
+            if isinstance(val, list):
+                for v in val:
+                    if v is None:
+                        continue
+                    items.extend([p.strip() for p in str(v).split(";") if p and p.strip()])
+                return items
+            return [p.strip() for p in str(val).split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "growth_reinvestment", "detail": _split_details_to_list(growth_analysis.get("details"))},
+            {"label": "risk_profile", "detail": _split_details_to_list(risk_analysis.get("details"))},
+            {"label": "relative_valuation", "detail": _split_details_to_list(relative_val_analysis.get("details"))},
+            {"label": "intrinsic_value_dcf", "detail": _split_details_to_list(intrinsic_val_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # ─── Push message back to graph state ──────────────────────────────────────
     message = HumanMessage(content=json.dumps(damodaran_signals), name=agent_id)
 

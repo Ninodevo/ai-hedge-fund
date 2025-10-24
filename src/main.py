@@ -86,6 +86,7 @@ def run_hedge_fund(
         return {
             "decisions": parse_hedge_fund_response(final_state["messages"][-1].content),
             "analyst_signals": final_state["data"]["analyst_signals"],
+            "analysis_details": final_state["data"]["analysis_details"],
         }
     finally:
         # Stop progress tracking
@@ -115,15 +116,18 @@ def create_workflow(selected_analysts=None):
         workflow.add_edge("start_node", node_name)
 
     # Always add risk and portfolio management
-    workflow.add_node("risk_management_agent", risk_management_agent)
+    # TODO: WE will disable this for now because we don't need it
+    # workflow.add_node("risk_management_agent", risk_management_agent)
     workflow.add_node("portfolio_manager", portfolio_management_agent)
 
     # Connect selected analysts to risk management
-    for analyst_key in selected_analysts:
-        node_name = analyst_nodes[analyst_key][0]
-        workflow.add_edge(node_name, "risk_management_agent")
+    # TODO: WE will disable this for now because we don't need it
+    # for analyst_key in selected_analysts:
+    #     node_name = analyst_nodes[analyst_key][0]
+    #     workflow.add_edge(node_name, "risk_management_agent")
 
-    workflow.add_edge("risk_management_agent", "portfolio_manager")
+    # TODO: WE will disable this for now because we don't need it   
+    # workflow.add_edge("risk_management_agent", "portfolio_manager")
     workflow.add_edge("portfolio_manager", END)
 
     workflow.set_entry_point("start_node")

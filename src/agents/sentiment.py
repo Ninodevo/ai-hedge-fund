@@ -117,6 +117,23 @@ def sentiment_analyst_agent(state: AgentState, agent_id: str = "sentiment_analys
 
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
 
+        # Persist structured details for UI/debugging
+        def _flatten_metrics(metrics: dict) -> list[str]:
+            items = []
+            for k, v in (metrics or {}).items():
+                items.append(f"{k}: {v}")
+            return items
+
+        structured_detail_items = [
+            {"label": "insider_trading", "detail": _flatten_metrics(reasoning.get("insider_trading", {}).get("metrics", {}))},
+            {"label": "news_sentiment", "detail": _flatten_metrics(reasoning.get("news_sentiment", {}).get("metrics", {}))},
+            {"label": "combined_analysis", "detail": _flatten_metrics(reasoning.get("combined_analysis", {}))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # Create the sentiment message
     message = HumanMessage(
         content=json.dumps(sentiment_analysis),

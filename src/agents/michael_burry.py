@@ -143,6 +143,23 @@ def michael_burry_agent(state: AgentState, agent_id: str = "michael_burry_agent"
 
         progress.update_status(agent_id, ticker, "Done", analysis=burry_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "value", "detail": _split_details_to_list(value_analysis.get("details"))},
+            {"label": "balance_sheet", "detail": _split_details_to_list(balance_sheet_analysis.get("details"))},
+            {"label": "insider_activity", "detail": _split_details_to_list(insider_analysis.get("details"))},
+            {"label": "contrarian_sentiment", "detail": _split_details_to_list(contrarian_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # ----------------------------------------------------------------------
     # Return to the graph
     # ----------------------------------------------------------------------

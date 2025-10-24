@@ -119,6 +119,28 @@ def growth_analyst_agent(state: AgentState, agent_id: str = "growth_analyst_agen
         }
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _flatten_dict(d: dict) -> list[str]:
+            if not isinstance(d, dict):
+                return []
+            items = []
+            for k, v in d.items():
+                items.append(f"{k}: {v}")
+            return items
+
+        structured_detail_items = [
+            {"label": "historical_growth", "detail": _flatten_dict(growth_trends)},
+            {"label": "growth_valuation", "detail": _flatten_dict(valuation_metrics)},
+            {"label": "margin_expansion", "detail": _flatten_dict(margin_trends)},
+            {"label": "insider_conviction", "detail": _flatten_dict(insider_conviction)},
+            {"label": "financial_health", "detail": _flatten_dict(financial_health)},
+            {"label": "final_analysis", "detail": _flatten_dict(reasoning.get("final_analysis", {}))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # ---- Emit message (for LLM tool chain) ----
     msg = HumanMessage(content=json.dumps(growth_analysis), name=agent_id)
     if state["metadata"].get("show_reasoning"):

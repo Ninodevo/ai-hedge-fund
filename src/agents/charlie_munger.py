@@ -136,6 +136,23 @@ def charlie_munger_agent(state: AgentState, agent_id: str = "charlie_munger_agen
         }
         
         progress.update_status(agent_id, ticker, "Done", analysis=munger_output.reasoning)
+
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details"))},
+            {"label": "management", "detail": _split_details_to_list(management_analysis.get("details"))},
+            {"label": "predictability", "detail": _split_details_to_list(predictability_analysis.get("details"))},
+            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
     
     # Wrap results in a single message for the chain
     message = HumanMessage(

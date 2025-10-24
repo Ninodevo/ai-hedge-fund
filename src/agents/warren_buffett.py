@@ -99,6 +99,43 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
                 5  # book_value_growth (0-5)
         )
 
+        # Join all analysis details into a single string
+        intrinsic_details = intrinsic_value_analysis.get("details")
+        if isinstance(intrinsic_details, list):
+            intrinsic_details = "; ".join(str(x) for x in intrinsic_details)
+        elif intrinsic_details is None:
+            intrinsic_details = ""
+
+        def _split_details_to_list(val):
+            """Normalize details into a list of strings, splitting on ';' and trimming."""
+            items: list[str] = []
+            if val is None:
+                return items
+            if isinstance(val, list):
+                for v in val:
+                    if v is None:
+                        continue
+                    if isinstance(v, str):
+                        parts = [p.strip() for p in v.split(";")]
+                        items.extend([p for p in parts if p])
+                    else:
+                        items.append(str(v))
+                return items
+            # string or other primitive
+            s = str(val)
+            parts = [p.strip() for p in s.split(";")]
+            return [p for p in parts if p]
+
+        structured_detail_items = [
+            {"label": "fundamentals", "detail": _split_details_to_list(fundamental_analysis.get("details", ""))},
+            {"label": "consistency", "detail": _split_details_to_list(consistency_analysis.get("details", ""))},
+            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details", ""))},
+            {"label": "management", "detail": _split_details_to_list(mgmt_analysis.get("details", ""))},
+            {"label": "pricing_power", "detail": _split_details_to_list(pricing_power_analysis.get("details", ""))},
+            {"label": "book_value", "detail": _split_details_to_list(book_value_analysis.get("details", ""))},
+            {"label": "intrinsic_value", "detail": _split_details_to_list(intrinsic_details)},
+        ]
+
         # Add margin of safety analysis if we have both intrinsic value and current price
         margin_of_safety = None
         intrinsic_value = intrinsic_value_analysis["intrinsic_value"]
@@ -136,6 +173,11 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             "reasoning": buffett_output.reasoning,
         }
 
+        # Persist detailed reasoning text per ticker for debugging/UX (safe-init)
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
         progress.update_status(agent_id, ticker, "Done", analysis=buffett_output.reasoning)
 
     # Create the message
@@ -147,6 +189,8 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
 
     # Add the signal to the analyst_signals list
     state["data"]["analyst_signals"][agent_id] = buffett_analysis
+
+    # analysis_details persisted per-ticker inside the loop above
 
     progress.update_status(agent_id, None, "Done")
 

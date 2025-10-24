@@ -79,6 +79,23 @@ def ben_graham_agent(state: AgentState, agent_id: str = "ben_graham_agent"):
 
         progress.update_status(agent_id, ticker, "Done", analysis=graham_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            items = []
+            if not val:
+                return items
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "earnings_stability", "detail": _split_details_to_list(earnings_analysis.get("details"))},
+            {"label": "financial_strength", "detail": _split_details_to_list(strength_analysis.get("details"))},
+            {"label": "graham_valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # Wrap results in a single message for the chain
     message = HumanMessage(content=json.dumps(graham_analysis), name=agent_id)
 

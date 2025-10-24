@@ -135,6 +135,25 @@ def technical_analyst_agent(state: AgentState, agent_id: str = "technical_analys
                 },
             },
         }
+
+        # Persist structured details for UI/debugging
+        def _flatten_metrics(metrics: dict) -> list[str]:
+            items = []
+            for k, v in (metrics or {}).items():
+                items.append(f"{k}: {v}")
+            return items
+
+        structured_detail_items = [
+            {"label": "trend_following", "detail": _flatten_metrics(trend_signals.get("metrics"))},
+            {"label": "mean_reversion", "detail": _flatten_metrics(mean_reversion_signals.get("metrics"))},
+            {"label": "momentum", "detail": _flatten_metrics(momentum_signals.get("metrics"))},
+            {"label": "volatility", "detail": _flatten_metrics(volatility_signals.get("metrics"))},
+            {"label": "statistical_arbitrage", "detail": _flatten_metrics(stat_arb_signals.get("metrics"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(technical_analysis, indent=4))
 
     # Create the technical analyst message

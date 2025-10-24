@@ -151,6 +151,25 @@ def phil_fisher_agent(state: AgentState, agent_id: str = "phil_fisher_agent"):
 
         progress.update_status(agent_id, ticker, "Done", analysis=fisher_output.reasoning)
 
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            if not val:
+                return []
+            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
+
+        structured_detail_items = [
+            {"label": "growth_quality", "detail": _split_details_to_list(growth_quality.get("details"))},
+            {"label": "margins_stability", "detail": _split_details_to_list(margins_stability.get("details"))},
+            {"label": "management_efficiency", "detail": _split_details_to_list(mgmt_efficiency.get("details"))},
+            {"label": "valuation", "detail": _split_details_to_list(fisher_valuation.get("details"))},
+            {"label": "insider_activity", "detail": _split_details_to_list(insider_activity.get("details"))},
+            {"label": "sentiment", "detail": _split_details_to_list(sentiment_analysis.get("details"))},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
     # Wrap results in a single message
     message = HumanMessage(content=json.dumps(fisher_analysis), name=agent_id)
 

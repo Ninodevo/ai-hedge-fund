@@ -141,6 +141,24 @@ def news_sentiment_agent(state: AgentState, agent_id: str = "news_sentiment_agen
             "reasoning": reasoning,
         }
 
+        # Persist structured details for UI/debugging
+        def _detail_from_counts():
+            return [
+                f"total_articles: {total_signals}",
+                f"bullish_articles: {bullish_signals}",
+                f"bearish_articles: {bearish_signals}",
+                f"neutral_articles: {neutral_signals}",
+                f"articles_classified_by_llm: {sentiments_classified_by_llm}",
+            ]
+
+        structured_detail_items = [
+            {"label": "news_sentiment", "detail": _detail_from_counts()},
+        ]
+
+        analysis_details = state["data"].setdefault("analysis_details", {})
+        agent_details = analysis_details.setdefault(agent_id, {})
+        agent_details[ticker] = structured_detail_items
+
         progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
 
     message = HumanMessage(
