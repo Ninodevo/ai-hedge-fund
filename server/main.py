@@ -85,9 +85,9 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12) ->
     analysis_details = result.get("analysis_details")
 
     # Enriched fundamentals/valuation/volatility block
-    enriched = collect_enriched_stock(symbol, months_back or 12)
+    # enriched = collect_enriched_stock(symbol, months_back or 12)
     # TODO: Implement this, commented out to avoid billing
-    # enriched = {}
+    enriched = {}
 
     return {
         "symbol": symbol,

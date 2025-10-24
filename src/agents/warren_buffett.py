@@ -92,11 +92,11 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
 
         # Update max possible score calculation
         max_possible_score = (
-                10 +  # fundamental_analysis (ROE, debt, margins, current ratio)
+                fundamental_analysis["max_score"] +  # fundamental_analysis (ROE, debt, margins, current ratio)
                 moat_analysis["max_score"] +
                 mgmt_analysis["max_score"] +
-                5 +  # pricing_power (0-5)
-                5  # book_value_growth (0-5)
+                pricing_power_analysis["max_score"] +  # pricing_power (0-5)
+                book_value_analysis["max_score"]  # book_value_growth (0-5)
         )
 
         # Join all analysis details into a single string
@@ -127,12 +127,12 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             return [p for p in parts if p]
 
         structured_detail_items = [
-            {"label": "fundamentals", "detail": _split_details_to_list(fundamental_analysis.get("details", ""))},
-            {"label": "consistency", "detail": _split_details_to_list(consistency_analysis.get("details", ""))},
-            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details", ""))},
-            {"label": "management", "detail": _split_details_to_list(mgmt_analysis.get("details", ""))},
-            {"label": "pricing_power", "detail": _split_details_to_list(pricing_power_analysis.get("details", ""))},
-            {"label": "book_value", "detail": _split_details_to_list(book_value_analysis.get("details", ""))},
+            {"label": "fundamentals", "detail": _split_details_to_list(fundamental_analysis.get("details", "")), "score": fundamental_analysis["score"], "max_score": fundamental_analysis["max_score"]},
+            {"label": "consistency", "detail": _split_details_to_list(consistency_analysis.get("details", "")), "score": consistency_analysis["score"]},
+            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details", "")), "score": moat_analysis["score"], "max_score": moat_analysis["max_score"]},
+            {"label": "management", "detail": _split_details_to_list(mgmt_analysis.get("details", "")), "score": mgmt_analysis["score"], "max_score": mgmt_analysis["max_score"]},
+            {"label": "pricing_power", "detail": _split_details_to_list(pricing_power_analysis.get("details", "")), "score": pricing_power_analysis["score"], "max_score": pricing_power_analysis["max_score"]},
+            {"label": "book_value", "detail": _split_details_to_list(book_value_analysis.get("details", "")), "score": book_value_analysis["score"], "max_score": book_value_analysis["max_score"]},
             {"label": "intrinsic_value", "detail": _split_details_to_list(intrinsic_details)},
         ]
 
@@ -176,7 +176,15 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
         # Persist detailed reasoning text per ticker for debugging/UX (safe-init)
         analysis_details = state["data"].setdefault("analysis_details", {})
         agent_details = analysis_details.setdefault(agent_id, {})
-        agent_details[ticker] = structured_detail_items
+        ticker_entry = agent_details.setdefault(ticker, {})
+        ticker_entry["analysis_data"] = {
+            "score": total_score,
+            "max_score": max_possible_score,
+            "market_cap": market_cap,
+            "margin_of_safety": margin_of_safety,
+            "intrinsic_value": intrinsic_value,
+        }
+        ticker_entry["analysis_details"] = structured_detail_items
 
         progress.update_status(agent_id, ticker, "Done", analysis=buffett_output.reasoning)
 
@@ -189,8 +197,6 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
 
     # Add the signal to the analyst_signals list
     state["data"]["analyst_signals"][agent_id] = buffett_analysis
-
-    # analysis_details persisted per-ticker inside the loop above
 
     progress.update_status(agent_id, None, "Done")
 
@@ -206,6 +212,7 @@ def analyze_fundamentals(metrics: list) -> dict[str, any]:
 
     score = 0
     reasoning = []
+    max_score = 10
 
     # Check ROE (Return on Equity)
     if latest_metrics.return_on_equity and latest_metrics.return_on_equity > 0.15:  # 15% ROE threshold
@@ -243,7 +250,7 @@ def analyze_fundamentals(metrics: list) -> dict[str, any]:
     else:
         reasoning.append("Current ratio data not available")
 
-    return {"score": score, "details": "; ".join(reasoning), "metrics": latest_metrics.model_dump()}
+    return {"score": score, "max_score": max_score, "details": "; ".join(reasoning), "metrics": latest_metrics.model_dump()}
 
 
 def analyze_consistency(financial_line_items: list) -> dict[str, any]:
@@ -686,6 +693,7 @@ def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
 
     score = 0
     reasoning = []
+    max_score = 5
 
     # Analyze growth consistency
     growth_periods = sum(1 for i in range(len(book_values) - 1) if book_values[i] > book_values[i + 1])
@@ -709,7 +717,7 @@ def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
     score += cagr_score
     reasoning.append(cagr_reason)
 
-    return {"score": score, "details": "; ".join(reasoning)}
+    return {"score": score, "max_score": max_score, "details": "; ".join(reasoning)}
 
 
 def _calculate_book_value_cagr(book_values: list) -> tuple[int, str]:
@@ -747,12 +755,22 @@ def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str
 
     score = 0
     reasoning = []
+    max_score = 5
 
     # Check gross margin trends (ability to maintain/expand margins)
     gross_margins = []
     for item in financial_line_items:
-        if hasattr(item, 'gross_margin') and item.gross_margin is not None:
-            gross_margins.append(item.gross_margin)
+        gm = getattr(item, 'gross_margin', None)
+        if gm is None:
+            gp = getattr(item, 'gross_profit', None)
+            rev = getattr(item, 'revenue', None)
+            if gp is not None and rev is not None and rev != 0:
+                try:
+                    gm = gp / rev
+                except Exception:
+                    gm = None
+        if gm is not None:
+            gross_margins.append(gm)
 
     if len(gross_margins) >= 3:
         # Check margin stability/improvement
@@ -783,6 +801,7 @@ def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str
 
     return {
         "score": score,
+        "max_score": max_score,
         "details": "; ".join(reasoning) if reasoning else "Limited pricing power analysis available"
     }
 
