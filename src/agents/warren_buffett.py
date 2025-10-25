@@ -29,7 +29,7 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
     for ticker in tickers:
         progress.update_status(agent_id, ticker, "Fetching financial metrics")
         # Fetch required data - request more periods for better trend analysis
-        metrics = get_financial_metrics(ticker, end_date, period="ttm", limit=10, api_key=api_key)
+        metrics = get_financial_metrics(ticker, end_date, period="ttm", limit=20, api_key=api_key)
 
         progress.update_status(agent_id, ticker, "Gathering financial line items")
         financial_line_items = search_line_items(
@@ -50,7 +50,7 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             ],
             end_date,
             period="ttm",
-            limit=10,
+            limit=20,
             api_key=api_key,
         )
 
@@ -79,6 +79,16 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
 
         progress.update_status(agent_id, ticker, "Calculating intrinsic value")
         intrinsic_value_analysis = calculate_intrinsic_value(financial_line_items)
+
+        # Calculate per-share values if available
+        current_price_per_share = None
+        intrinsic_value_per_share = intrinsic_value_analysis.get("intrinsic_value_per_share")
+        try:
+            shares_outstanding_ps = getattr(financial_line_items[0], 'outstanding_shares', None)
+            if market_cap and shares_outstanding_ps:
+                current_price_per_share = market_cap / shares_outstanding_ps
+        except Exception:
+            current_price_per_share = None
 
         # Calculate total score without circle of competence (LLM will handle that)
         total_score = (
@@ -142,6 +152,23 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
         if intrinsic_value and market_cap:
             margin_of_safety = (intrinsic_value - market_cap) / market_cap
 
+        # Determine required margin of safety based on quality (higher quality → lower required MOS)
+        required_mos = None
+        required_mos_on_price_basis = None
+        required_mos_buy_price_per_share = None
+        try:
+            quality = (total_score / max_possible_score) if max_possible_score else 0
+            # Linear map: quality 1.0 → 20% MOS, quality 0.0 → 50% MOS
+            required_mos = 0.5 - 0.3 * max(0.0, min(1.0, quality))
+            # Clamp between 20% and 50%
+            required_mos = max(0.2, min(0.5, required_mos))
+            # Convert required MOS (on intrinsic basis) to price-based MOS threshold for comparison with (IV-P)/P
+            required_mos_on_price_basis = required_mos / (1 - required_mos)
+            if intrinsic_value_per_share:
+                required_mos_buy_price_per_share = intrinsic_value_per_share * (1 - required_mos)
+        except Exception:
+            pass
+
         # Combine all analysis results for LLM evaluation
         analysis_data[ticker] = {
             "ticker": ticker,
@@ -156,6 +183,11 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             "intrinsic_value_analysis": intrinsic_value_analysis,
             "market_cap": market_cap,
             "margin_of_safety": margin_of_safety,
+            "current_price_per_share": current_price_per_share,
+            "intrinsic_value_per_share": intrinsic_value_per_share,
+            "required_mos": required_mos,
+            "required_mos_on_price_basis": required_mos_on_price_basis,
+            "required_mos_buy_price_per_share": required_mos_buy_price_per_share,
         }
 
         progress.update_status(agent_id, ticker, "Generating Warren Buffett analysis")
@@ -183,6 +215,11 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             "market_cap": market_cap,
             "margin_of_safety": margin_of_safety,
             "intrinsic_value": intrinsic_value,
+            "current_price_per_share": current_price_per_share,
+            "intrinsic_value_per_share": intrinsic_value_per_share,
+            "required_mos": required_mos,
+            "required_mos_on_price_basis": required_mos_on_price_basis,
+            "required_mos_buy_price_per_share": required_mos_buy_price_per_share,
         }
         ticker_entry["analysis_details"] = structured_detail_items
 
@@ -645,15 +682,17 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
     # Total intrinsic value
     intrinsic_value = stage1_pv + stage2_pv + terminal_pv
 
-    # Apply additional margin of safety (Buffett's conservatism)
-    conservative_intrinsic_value = intrinsic_value * 0.85  # 15% additional haircut
+    conservative_intrinsic_value = intrinsic_value
+
+    # Compute per-share intrinsic value
+    intrinsic_value_per_share = conservative_intrinsic_value / shares_outstanding if shares_outstanding else None
 
     details.extend([
         f"Stage 1 PV: ${stage1_pv:,.0f}",
         f"Stage 2 PV: ${stage2_pv:,.0f}",
         f"Terminal PV: ${terminal_pv:,.0f}",
         f"Total IV: ${intrinsic_value:,.0f}",
-        f"Conservative IV (15% haircut): ${conservative_intrinsic_value:,.0f}",
+        f"Intrinsic value per share: ${intrinsic_value_per_share:,.2f}" if intrinsic_value_per_share else "Intrinsic value per share: N/A",
         f"Owner earnings: ${owner_earnings:,.0f}",
         f"Discount rate: {discount_rate:.1%}"
     ])
@@ -672,6 +711,7 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
             "historical_growth": conservative_growth if 'conservative_growth' in locals() else None,
         },
         "details": details,
+        "intrinsic_value_per_share": intrinsic_value_per_share,
     }
 
 
@@ -827,6 +867,11 @@ def generate_buffett_output(
         "intrinsic_value": analysis_data.get("intrinsic_value_analysis", {}).get("intrinsic_value"),
         "market_cap": analysis_data.get("market_cap"),
         "margin_of_safety": analysis_data.get("margin_of_safety"),
+        "current_price_per_share": analysis_data.get("current_price_per_share"),
+        "intrinsic_value_per_share": analysis_data.get("intrinsic_value_per_share"),
+        "required_mos": analysis_data.get("required_mos"),
+        "required_mos_on_price_basis": analysis_data.get("required_mos_on_price_basis"),
+        "required_mos_buy_price_per_share": analysis_data.get("required_mos_buy_price_per_share"),
     }
 
     template = ChatPromptTemplate.from_messages(
@@ -855,7 +900,7 @@ def generate_buffett_output(
                 "- 30-49%: Outside my expertise or concerning fundamentals\n"
                 "- 10-29%: Poor business or significantly overvalued\n"
                 "\n"
-                "Keep reasoning under 120 characters. Do not invent data. Return JSON only."
+                "Do not invent data. If margin of safety is less than 0, don't say it's negative. Return JSON only."
             ),
             (
                 "human",
