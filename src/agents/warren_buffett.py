@@ -16,6 +16,15 @@ class WarrenBuffettSignal(BaseModel):
     reasoning: str = Field(description="Reasoning for the decision")
 
 
+def _get_item_date(obj):
+    # Prefer concrete report dates over generic period labels like 'ttm'
+    for attr in ("date", "report_period", "period_end", "end_date", "as_of_date", "fiscal_date", "report_date"):
+        val = getattr(obj, attr, None)
+        if val:
+            return val
+    return None
+
+
 def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agent"):
     """Analyzes stocks using Buffett's principles and LLM reasoning."""
     data = state["data"]
@@ -137,13 +146,13 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             return [p for p in parts if p]
 
         structured_detail_items = [
-            {"label": "fundamentals", "detail": _split_details_to_list(fundamental_analysis.get("details", "")), "score": fundamental_analysis["score"], "max_score": fundamental_analysis["max_score"]},
-            {"label": "consistency", "detail": _split_details_to_list(consistency_analysis.get("details", "")), "score": consistency_analysis["score"]},
-            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details", "")), "score": moat_analysis["score"], "max_score": moat_analysis["max_score"]},
-            {"label": "management", "detail": _split_details_to_list(mgmt_analysis.get("details", "")), "score": mgmt_analysis["score"], "max_score": mgmt_analysis["max_score"]},
-            {"label": "pricing_power", "detail": _split_details_to_list(pricing_power_analysis.get("details", "")), "score": pricing_power_analysis["score"], "max_score": pricing_power_analysis["max_score"]},
-            {"label": "book_value", "detail": _split_details_to_list(book_value_analysis.get("details", "")), "score": book_value_analysis["score"], "max_score": book_value_analysis["max_score"]},
-            {"label": "intrinsic_value", "detail": _split_details_to_list(intrinsic_details)},
+            {"label": "fundamentals", "detail": _split_details_to_list(fundamental_analysis.get("details", "")), "data": fundamental_analysis.get("data"), "score": fundamental_analysis["score"], "max_score": fundamental_analysis["max_score"]},
+            {"label": "consistency", "detail": _split_details_to_list(consistency_analysis.get("details", "")), "data": consistency_analysis.get("data"), "score": consistency_analysis["score"]},
+            {"label": "moat", "detail": _split_details_to_list(moat_analysis.get("details", "")), "data": moat_analysis.get("data"), "score": moat_analysis["score"], "max_score": moat_analysis["max_score"]},
+            {"label": "management", "detail": _split_details_to_list(mgmt_analysis.get("details", "")), "data": mgmt_analysis.get("data"), "score": mgmt_analysis["score"], "max_score": mgmt_analysis["max_score"]},
+            {"label": "pricing_power", "detail": _split_details_to_list(pricing_power_analysis.get("details", "")), "data": pricing_power_analysis.get("data"), "score": pricing_power_analysis["score"], "max_score": pricing_power_analysis["max_score"]},
+            {"label": "book_value", "detail": _split_details_to_list(book_value_analysis.get("details", "")), "data": book_value_analysis.get("data"), "score": book_value_analysis["score"], "max_score": book_value_analysis["max_score"]},
+            {"label": "intrinsic_value", "detail": _split_details_to_list(intrinsic_details), "data": intrinsic_value_analysis.get("data")},
         ]
 
         # Add margin of safety analysis if we have both intrinsic value and current price
@@ -287,7 +296,20 @@ def analyze_fundamentals(metrics: list) -> dict[str, any]:
     else:
         reasoning.append("Current ratio data not available")
 
-    return {"score": score, "max_score": max_score, "details": "; ".join(reasoning), "metrics": latest_metrics.model_dump()}
+    data = {
+        "return_on_equity": getattr(latest_metrics, "return_on_equity", None),
+        "debt_to_equity": getattr(latest_metrics, "debt_to_equity", None),
+        "operating_margin": getattr(latest_metrics, "operating_margin", None),
+        "current_ratio": getattr(latest_metrics, "current_ratio", None),
+        "date": _get_item_date(latest_metrics),
+    }
+    return {
+        "score": score,
+        "max_score": max_score,
+        "details": "; ".join(reasoning),
+        "metrics": latest_metrics.model_dump(),
+        "data": data,
+    }
 
 
 def analyze_consistency(financial_line_items: list) -> dict[str, any]:
@@ -300,6 +322,7 @@ def analyze_consistency(financial_line_items: list) -> dict[str, any]:
 
     # Check earnings growth trend
     earnings_values = [item.net_income for item in financial_line_items if item.net_income]
+    earnings_dates = [_get_item_date(item) for item in financial_line_items if getattr(item, 'net_income', None)]
     if len(earnings_values) >= 4:
         # Simple check: is each period's earnings bigger than the next?
         earnings_growth = all(earnings_values[i] > earnings_values[i + 1] for i in range(len(earnings_values) - 1))
@@ -320,6 +343,11 @@ def analyze_consistency(financial_line_items: list) -> dict[str, any]:
     return {
         "score": score,
         "details": "; ".join(reasoning),
+        "data": {
+            "earnings_values": earnings_values,
+            "earnings_dates": earnings_dates,
+            "earnings_growth_monotonic": True if len(earnings_values) >= 2 else None,
+        },
     }
 
 
@@ -419,6 +447,14 @@ def analyze_moat(metrics: list) -> dict[str, any]:
         "score": moat_score,
         "max_score": max_score,
         "details": "; ".join(reasoning) if reasoning else "Limited moat analysis available",
+        "data": {
+            "historical_roes": historical_roes,
+            "historical_margins": historical_margins if 'historical_margins' in locals() else [],
+            "asset_turnovers": asset_turnovers if 'asset_turnovers' in locals() else [],
+            "dates": [
+                _get_item_date(m) for m in metrics if hasattr(m, 'return_on_equity') or hasattr(m, 'operating_margin')
+            ],
+        },
     }
 
 
@@ -462,6 +498,12 @@ def analyze_management_quality(financial_line_items: list) -> dict[str, any]:
         "score": mgmt_score,
         "max_score": 2,
         "details": "; ".join(reasoning),
+        "data": {
+            "issuance_or_purchase_of_equity_shares": getattr(latest, "issuance_or_purchase_of_equity_shares", None),
+            "dividends_and_other_cash_distributions": getattr(latest, "dividends_and_other_cash_distributions", None),
+            "outstanding_shares": getattr(latest, "outstanding_shares", None),
+            "date": _get_item_date(latest),
+        },
     }
 
 
@@ -618,7 +660,7 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
 
     # Estimate growth rate based on historical performance (more conservative)
     historical_earnings = []
-    for item in financial_line_items[:5]:  # Last 5 years
+    for item in financial_line_items[:20]:  # Last 5 years
         if hasattr(item, 'net_income') and item.net_income:
             historical_earnings.append(item.net_income)
 
@@ -651,8 +693,8 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
     discount_rate = 0.10
 
     # Three-stage DCF model
-    stage1_years = 5  # High growth phase
-    stage2_years = 5  # Transition phase
+    stage1_years = 20  # High growth phase
+    stage2_years = 20  # Transition phase
 
     present_value = 0
     details.append(
@@ -712,6 +754,14 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
         },
         "details": details,
         "intrinsic_value_per_share": intrinsic_value_per_share,
+        "data": {
+            "historical_earnings": historical_earnings,
+            "owner_earnings": owner_earnings,
+            "owner_earnings_components": earnings_data.get("components", {}),
+            "stage_pv": {"stage1": stage1_pv, "stage2": stage2_pv, "terminal": terminal_pv},
+            "discount_rate": discount_rate,
+            "dates": [_get_item_date(item) for item in financial_line_items[:20]],
+        },
     }
 
 
@@ -757,7 +807,15 @@ def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
     score += cagr_score
     reasoning.append(cagr_reason)
 
-    return {"score": score, "max_score": max_score, "details": "; ".join(reasoning)}
+    return {
+        "score": score,
+        "max_score": max_score,
+        "details": "; ".join(reasoning),
+        "data": {
+            "book_values": book_values,
+            "dates": [_get_item_date(item) for item in financial_line_items],
+        },
+    }
 
 
 def _calculate_book_value_cagr(book_values: list) -> tuple[int, str]:
@@ -842,7 +900,11 @@ def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str
     return {
         "score": score,
         "max_score": max_score,
-        "details": "; ".join(reasoning) if reasoning else "Limited pricing power analysis available"
+        "details": "; ".join(reasoning) if reasoning else "Limited pricing power analysis available",
+        "data": {
+            "gross_margins": gross_margins,
+            "dates": [_get_item_date(item) for item in financial_line_items],
+        },
     }
 
 
