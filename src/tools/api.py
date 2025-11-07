@@ -18,6 +18,11 @@ from src.data.models import (
     InsiderTradeResponse,
     CompanyFactsResponse,
 )
+from src.utils.data_freshness import (
+    is_data_stale,
+    get_freshness_warning,
+    should_fallback_to_quarterly,
+)
 
 # Global cache instance
 _cache = get_cache()
@@ -95,14 +100,81 @@ def get_financial_metrics(
     period: str = "ttm",
     limit: int = 10,
     api_key: str = None,
+    check_freshness: bool = True,
+    max_age_days: int = 180,
+    fallback_to_quarterly: bool = False,
+    prefer_fresh: bool = False,
 ) -> list[FinancialMetrics]:
-    """Fetch financial metrics from cache or API."""
+    """
+    Fetch financial metrics from cache or API.
+    
+    Args:
+        ticker: Stock ticker symbol
+        end_date: End date for query (YYYY-MM-DD)
+        period: Period type ("ttm", "quarterly", "annual")
+        limit: Maximum number of periods to fetch
+        api_key: API key for authentication
+        check_freshness: Whether to check if data is stale (default: True)
+        max_age_days: Maximum age in days before data is considered stale (default: 180)
+        fallback_to_quarterly: If TTM is stale, try fetching quarterly data (default: False)
+        prefer_fresh: If True, prefer quarterly over TTM when both are fresh (default: False)
+                      When True, will try quarterly first, fallback to TTM if quarterly is stale
+    
+    Returns:
+        List of FinancialMetrics objects
+    """
+    # If prefer_fresh is True and period is "ttm", try quarterly first
+    if prefer_fresh and period == "ttm":
+        quarterly_metrics = get_financial_metrics(
+            ticker=ticker,
+            end_date=end_date,
+            period="quarterly",
+            limit=limit,
+            api_key=api_key,
+            check_freshness=check_freshness,
+            max_age_days=max_age_days,
+            fallback_to_quarterly=False,
+            prefer_fresh=False,  # Avoid recursion
+        )
+        
+        # If quarterly is fresh or we got data, use it
+        if quarterly_metrics:
+            is_stale, age_days, report_period = is_data_stale(quarterly_metrics, max_age_days, end_date)
+            if not is_stale or age_days is None:
+                return quarterly_metrics
+            # If quarterly is also stale, fall through to TTM
+        
+        # If quarterly was stale or unavailable, try TTM as fallback
+        print(f"{ticker}: Quarterly data is stale, trying TTM as fallback")
+    
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{period}_{end_date}_{limit}"
     
     # Check cache first - simple exact match
     if cached_data := _cache.get_financial_metrics(cache_key):
-        return [FinancialMetrics(**metric) for metric in cached_data]
+        metrics = [FinancialMetrics(**metric) for metric in cached_data]
+        
+        # Check freshness even for cached data
+        if check_freshness and period == "ttm" and metrics:
+            is_stale, age_days, report_period = is_data_stale(metrics, max_age_days, end_date)
+            if is_stale and fallback_to_quarterly:
+                # Try fetching quarterly data instead
+                quarterly_metrics = get_financial_metrics(
+                    ticker=ticker,
+                    end_date=end_date,
+                    period="quarterly",
+                    limit=limit,
+                    api_key=api_key,
+                    check_freshness=False,  # Avoid infinite recursion
+                    fallback_to_quarterly=False,
+                )
+                if quarterly_metrics:
+                    warning = get_freshness_warning(age_days, report_period, "TTM")
+                    if warning:
+                        print(f"{ticker}: {warning}")
+                    return quarterly_metrics
+        
+        return metrics
 
     # If not in cache, fetch from API
     headers = {}
@@ -121,6 +193,32 @@ def get_financial_metrics(
 
     if not financial_metrics:
         return []
+
+    # Check freshness for TTM data
+    if check_freshness and period == "ttm":
+        is_stale, age_days, report_period = is_data_stale(financial_metrics, max_age_days, end_date)
+        
+        if is_stale and fallback_to_quarterly:
+            # Try fetching quarterly data as fallback
+            quarterly_metrics = get_financial_metrics(
+                ticker=ticker,
+                end_date=end_date,
+                period="quarterly",
+                limit=limit,
+                api_key=api_key,
+                check_freshness=False,  # Avoid infinite recursion
+                fallback_to_quarterly=False,
+            )
+            if quarterly_metrics:
+                warning = get_freshness_warning(age_days, report_period, "TTM")
+                if warning:
+                    print(f"{ticker}: {warning}")
+                return quarterly_metrics
+        
+        # Log warning even if we don't fallback
+        warning = get_freshness_warning(age_days, report_period, "TTM")
+        if warning:
+            print(f"{ticker}: {warning}")
 
     # Cache the results as dicts using the comprehensive cache key
     _cache.set_financial_metrics(cache_key, [m.model_dump() for m in financial_metrics])

@@ -1,5 +1,6 @@
 import datetime
 from typing import Any, Dict, List, Optional
+from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 
@@ -11,6 +12,43 @@ from src.tools.api import (
     get_company_news,
 )
 from src.backtesting.metrics import PerformanceMetricsCalculator
+
+
+def _estimate_next_report_date(report_period: str, fiscal_period: Optional[str] = None) -> Optional[str]:
+    """
+    Estimate the next expected report date based on the last report period.
+    
+    SEC filing deadlines:
+    - Quarterly (10-Q): ~45 days after quarter end (40 for accelerated filers)
+    - Annual (10-K): ~60-90 days after fiscal year end
+    
+    Args:
+        report_period: Last fiscal period end date (YYYY-MM-DD)
+        fiscal_period: Fiscal period identifier (e.g., "2024-Q1", "2023-Annual")
+    
+    Returns:
+        Estimated next report date (YYYY-MM-DD) or None if cannot determine
+    """
+    try:
+        last_report_date = datetime.datetime.strptime(report_period, "%Y-%m-%d")
+        
+        # Determine if this was quarterly or annual
+        is_annual = fiscal_period and ("annual" in fiscal_period.lower() or "year" in fiscal_period.lower())
+        
+        if is_annual:
+            # Annual report: typically 60-90 days after fiscal year end
+            # Use 75 days as average
+            next_report = last_report_date + relativedelta(days=75)
+        else:
+            # Quarterly report: typically 40-45 days after quarter end
+            # Use 45 days as average, then add 3 months for next quarter
+            next_report = last_report_date + relativedelta(days=45)
+            # Add 3 months to get to next quarter's report date
+            next_report = next_report + relativedelta(months=3)
+        
+        return next_report.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
 
 
 def _safe_pct(value: Optional[float]) -> Optional[float]:
@@ -48,30 +86,96 @@ def collect_quick_facts(symbol: str, as_of: str) -> Dict[str, Any]:
     }
 
 
-def collect_valuation_metrics(symbol: str, as_of: str) -> Dict[str, Any]:
-    metrics = get_financial_metrics(symbol, as_of, period="ttm", limit=1)
+def collect_valuation_metrics(symbol: str, as_of: str, period_type: str = "ttm") -> Dict[str, Any]:
+    """
+    Collect valuation metrics.
+    
+    Args:
+        symbol: Stock ticker symbol
+        as_of: Date string (YYYY-MM-DD)
+        period_type: "ttm" or "quarterly" - which period type to use
+    """
+    # Determine behavior based on period_type
+    if period_type == "quarterly":
+        # Use quarterly directly, no fallback needed
+        metrics = get_financial_metrics(
+            symbol, 
+            as_of, 
+            period="quarterly", 
+            limit=1,
+            check_freshness=False,  # Quarterly is always fresh by definition
+            fallback_to_quarterly=False,
+            prefer_fresh=False,
+        )
+    else:
+        # Default TTM behavior with smart fallback
+        metrics = get_financial_metrics(
+            symbol, 
+            as_of, 
+            period="ttm", 
+            limit=1,
+            check_freshness=True,
+            fallback_to_quarterly=True,  # Enable fallback for current reports
+            prefer_fresh=True,  # Prefer quarterly if it's fresher
+        )
     if not metrics:
         return {}
     m = metrics[0]
-    return {
+    
+    result = {
         "pe": m.price_to_earnings_ratio,
         "ev_ebitda": m.enterprise_value_to_ebitda_ratio,
         "ps": m.price_to_sales_ratio,
         "p_fcf": None if m.free_cash_flow_yield is None else (1.0 / m.free_cash_flow_yield if m.free_cash_flow_yield != 0 else None),
         "ev": m.enterprise_value,
+        "date_reported": m.report_period,  # Fiscal period end date from SEC filings (10-Q/10-K)
+        "fiscal_period": getattr(m, "fiscal_period", None),  # e.g., "2024-Q1"
+        "next_report_estimated": _estimate_next_report_date(m.report_period, getattr(m, "fiscal_period", None)),
     }
+    
+    return result
 
 
-def collect_growth_profit_quality(symbol: str, as_of: str) -> Dict[str, Any]:
-    # Get last 9 quarterly or 3 yearly datapoints if available by using limit
-    metrics = get_financial_metrics(symbol, as_of, period="ttm", limit=6)
+def collect_growth_profit_quality(symbol: str, as_of: str, period_type: str = "ttm") -> Dict[str, Any]:
+    """
+    Collect growth and profit quality metrics.
+    
+    Args:
+        symbol: Stock ticker symbol
+        as_of: Date string (YYYY-MM-DD)
+        period_type: "ttm" or "quarterly" - which period type to use
+    """
+    # Determine behavior based on period_type
+    if period_type == "quarterly":
+        # Use quarterly directly, no fallback needed
+        metrics = get_financial_metrics(
+            symbol, 
+            as_of, 
+            period="quarterly", 
+            limit=6,
+            check_freshness=False,  # Quarterly is always fresh by definition
+            fallback_to_quarterly=False,
+            prefer_fresh=False,
+        )
+    else:
+        # Default TTM behavior with smart fallback
+        metrics = get_financial_metrics(
+            symbol, 
+            as_of, 
+            period="ttm", 
+            limit=6,
+            check_freshness=True,
+            fallback_to_quarterly=True,  # Enable fallback for current reports
+            prefer_fresh=True,  # Prefer quarterly if it's fresher
+        )
     if not metrics:
         return {}
     # Use available fields for growth approximations
     rev_g = metrics[0].revenue_growth
     eps_g = metrics[0].earnings_per_share_growth
     fcf_g = metrics[0].free_cash_flow_growth
-    return {
+    
+    result = {
         "growth": {
             "revenue_cagr_3y": _safe_pct(rev_g),
             "eps_cagr_3y": _safe_pct(eps_g),
@@ -81,7 +185,11 @@ def collect_growth_profit_quality(symbol: str, as_of: str) -> Dict[str, Any]:
             "fcf_margin": metrics[0].free_cash_flow_per_share,  # placeholder if margin not available
             "cfo_to_net_income": metrics[0].operating_cash_flow_ratio,
         },
+        "date_reported": metrics[0].report_period,  # Fiscal period end date from SEC filings (10-Q/10-K)
+        "fiscal_period": getattr(metrics[0], "fiscal_period", None),  # e.g., "2024-Q1"
     }
+    
+    return result
 
 
 def collect_volatility_and_beta(symbol: str, start_date: str, end_date: str) -> Dict[str, Any]:
@@ -123,15 +231,26 @@ def collect_volatility_and_beta(symbol: str, start_date: str, end_date: str) -> 
     }
 
 
-def collect_enriched_stock(symbol: str, months_back: int = 12) -> Dict[str, Any]:
+def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str = "ttm") -> Dict[str, Any]:
+    """
+    Collect enriched stock data including valuation, growth, and quality metrics.
+    
+    Args:
+        symbol: Stock ticker symbol
+        months_back: Number of months of historical data to include
+        period_type: "ttm" or "quarterly" - which period type to use for financial metrics
+    """
     end_date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
     start_date = (datetime.datetime.utcnow() - datetime.timedelta(days=30 * months_back)).strftime("%Y-%m-%d")
 
     facts = collect_quick_facts(symbol, end_date)
-    valuation = collect_valuation_metrics(symbol, end_date)
-    growth_profit = collect_growth_profit_quality(symbol, end_date)
+    valuation = collect_valuation_metrics(symbol, end_date, period_type=period_type)
+    growth_profit = collect_growth_profit_quality(symbol, end_date, period_type=period_type)
     vol_beta = collect_volatility_and_beta(symbol, start_date, end_date)
     news_items = collect_latest_news(symbol, days_back=30, max_items=20)
+
+    # Extract next_report_estimated from valuation if available
+    next_report_estimated = valuation.get("next_report_estimated") if valuation else None
 
     enriched: Dict[str, Any] = {
         "quick_facts": facts,
@@ -139,6 +258,7 @@ def collect_enriched_stock(symbol: str, months_back: int = 12) -> Dict[str, Any]
         **growth_profit,
         **vol_beta,
         "news": news_items,
+        "next_report_estimated": next_report_estimated,  # Estimated next report/filing date
     }
     return enriched
 

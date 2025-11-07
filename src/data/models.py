@@ -17,8 +17,9 @@ class PriceResponse(BaseModel):
 
 class FinancialMetrics(BaseModel):
     ticker: str
-    report_period: str
-    period: str
+    report_period: str  # Fiscal period end date (YYYY-MM-DD) from SEC filings
+    fiscal_period: str | None = None  # Fiscal period identifier (e.g., "2024-Q1", "2023-Annual")
+    period: str  # Period type: "ttm", "quarterly", or "annual"
     currency: str
     market_cap: float | None
     enterprise_value: float | None
