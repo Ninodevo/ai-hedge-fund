@@ -116,6 +116,18 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, pe
 
     # Enriched fundamentals/valuation/volatility block
     enriched = collect_enriched_stock(symbol, months_back or 12, period_type=period_type)
+    
+    # Add price data to provenance if available
+    if price_snapshot and "data_provenance" in enriched:
+        from server.data_provenance import DataProvenance
+        price_provenance = DataProvenance()
+        price_provenance.add_price_data(price_snapshot, end_date)
+        # Merge price provenance into enriched provenance
+        enriched["data_provenance"]["parameters"].update(price_provenance.get_provenance())
+        # Recalculate summary with all parameters
+        temp_provenance = DataProvenance()
+        temp_provenance.provenance = enriched["data_provenance"]["parameters"]
+        enriched["data_provenance"]["summary"] = temp_provenance.get_summary()
     # TODO: Implement this, commented out to avoid billing
     # enriched = {}
 
