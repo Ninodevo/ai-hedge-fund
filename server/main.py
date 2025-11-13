@@ -52,6 +52,133 @@ class ReportPayload(BaseModel):
 @app.get("/health")
 def health(): return {"ok": True}
 
+class NewsAnalysisPayload(BaseModel):
+    symbol: str
+    model_name: Optional[str] = "gpt-5-mini"
+    model_provider: Optional[str] = "OPENAI"
+    reasoning_depth: Optional[str] = None  # "low", "medium", or "high"
+
+@app.post("/v1/news-analysis")
+def analyze_news_endpoint(p: NewsAnalysisPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    Test endpoint for news analysis with web search.
+    Allows testing different models and reasoning_depth settings.
+    """
+    _require(authorization)
+    symbol = p.symbol.upper()
+    
+    # Import here to avoid circular imports
+    from server.collectors import collect_latest_news
+    
+    try:
+
+        # The analysis is done inside collect_latest_news using _analyze_news_with_llm
+        # But we need to call it directly with our parameters
+        from server.collectors import _analyze_news_with_llm
+        
+        analysis_result = _analyze_news_with_llm(
+            symbol=symbol,
+            news_items=[],
+            api_keys=None,
+            model_name=p.model_name or "gpt-5",
+            model_provider=p.model_provider or "OPENAI",
+            reasoning_depth=p.reasoning_depth
+        )
+        
+        # Check if analysis failed
+        if analysis_result is None:
+            return {
+                "symbol": symbol,
+                "model_name": p.model_name,
+                "model_provider": p.model_provider,
+                "reasoning_depth": p.reasoning_depth,
+                "analysis": None,
+                "token_usage": None,
+                "cost_usd": None,
+                "status": "error",
+                "error": "Analysis returned None - check server logs for details"
+            }
+        
+        # Extract analysis, token usage, and cost from result
+        analysis_text = analysis_result.get("analysis") if isinstance(analysis_result, dict) else analysis_result
+        token_usage = analysis_result.get("token_usage") if isinstance(analysis_result, dict) else None
+        cost_usd = analysis_result.get("cost_usd") if isinstance(analysis_result, dict) else None
+        
+        return {
+            "symbol": symbol,
+            "model_name": p.model_name,
+            "model_provider": p.model_provider,
+            "reasoning_depth": p.reasoning_depth,
+            "analysis": analysis_text,
+            "token_usage": token_usage,
+            "cost_usd": cost_usd,
+            "status": "success"
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in news analysis endpoint: {e}")
+        print(error_details)
+        return {
+            "symbol": symbol if 'symbol' in locals() else "UNKNOWN",
+            "model_name": p.model_name if 'p' in locals() else None,
+            "model_provider": p.model_provider if 'p' in locals() else None,
+            "reasoning_depth": p.reasoning_depth if 'p' in locals() else None,
+            "analysis": None,
+            "status": "error",
+            "error": str(e),
+            "traceback": error_details
+        }
+
+class NewsFetchPayload(BaseModel):
+    symbol: str
+    days_back: Optional[int] = 30
+    max_items: Optional[int] = 20
+
+@app.post("/v1/news")
+def fetch_news_endpoint(p: NewsFetchPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    Test endpoint to fetch news for a stock without analysis.
+    Returns raw news items from the Financial Datasets API.
+    """
+    _require(authorization)
+    symbol = p.symbol.upper()
+    
+    # Import here to avoid circular imports
+    from server.collectors import collect_latest_news
+    
+    try:
+        # Fetch news without analysis
+        news_data = collect_latest_news(
+            symbol=symbol,
+            days_back=p.days_back or 30,
+            max_items=p.max_items or 20,
+            analyze=False,  # Don't analyze, just fetch news
+            api_keys=None  # Will use environment variables
+        )
+        
+        return {
+            "symbol": symbol,
+            "days_back": p.days_back or 30,
+            "max_items": p.max_items or 20,
+            "items_count": len(news_data.get("items", [])),
+            "items": news_data.get("items", []),
+            "status": "success"
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error fetching news for {symbol}: {e}")
+        print(error_details)
+        return {
+            "symbol": symbol,
+            "items_count": 0,
+            "items": [],
+            "status": "error",
+            "error": str(e),
+            "traceback": error_details
+        }
+
 @app.post("/v1/report")
 def generate_report(p: ReportPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
     _require(authorization)
@@ -103,7 +230,7 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, pe
         portfolio=portfolio,
         show_reasoning=True,
         selected_analysts=[analyst_key],
-        model_name="gpt-4.1",
+        model_name="gpt-5-mini",
         model_provider="OpenAI",
     )
 

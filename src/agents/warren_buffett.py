@@ -972,7 +972,7 @@ def generate_buffett_output(
                 "{{\n"
                 '  "signal": "bullish" | "bearish" | "neutral",\n'
                 '  "confidence": int,\n'
-                '  "reasoning": "short justification"\n'
+                '  "reasoning": "detailed justification"\n'
                 "}}"
             ),
         ]
