@@ -537,172 +537,270 @@ def _analyze_news_with_llm(
         else:
             model_provider_enum = model_provider
         
-        # Use OpenAI's built-in web search tool if using OpenAI models
-        # OpenAI models have native web_search capability through the Responses API
-        # According to OpenAI docs: https://platform.openai.com/docs/guides/tools-web-search
-        use_web_search = (model_provider_enum == ModelProvider.OPENAI and 
-                         model_name in ["gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-4-turbo", "gpt-5", "gpt-5-mini", "gpt-5-nano"])
+        # Use DuckDuckGo for web search (free, no API key required)
+        use_web_search = True  # Always use web search for better results
         
-        # Get model - configure web_search and reasoning_depth appropriately
-        from langchain_openai import ChatOpenAI
-        api_key = (api_keys or {}).get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_API_BASE")
-        
-        # Build model kwargs
-        model_init_kwargs = {
-            "model": model_name,
-            "api_key": api_key,
-            "base_url": base_url
-        }
-        
-        # Configure reasoning parameters (only if web_search is NOT enabled)
-        if reasoning_depth and model_provider_enum == ModelProvider.OPENAI and not use_web_search:
+        # Get model with reasoning_depth if needed
+        if reasoning_depth and model_provider_enum == ModelProvider.OPENAI:
+            from langchain_openai import ChatOpenAI
+            api_key = (api_keys or {}).get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+            base_url = os.environ.get("OPENAI_API_BASE")
+            
             # Configure reasoning parameter based on model
             if model_name.startswith("gpt-5") and reasoning_depth.lower() in ["low", "medium", "high", "minimal"]:
-                # GPT-5 uses reasoning_effort
-                model_init_kwargs["model_kwargs"] = {"reasoning_effort": reasoning_depth.lower()}
-                print(f"Configured reasoning_effort={reasoning_depth.lower()} for GPT-5 (web_search disabled)")
-            elif reasoning_depth.lower() in ["low", "medium", "high"]:
-                # Other models might use reasoning_depth (if supported)
-                print(f"Note: reasoning_depth not yet supported for {model_name} without web_search")
-        elif reasoning_depth and use_web_search:
-            print(f"Note: reasoning_depth parameter skipped when web_search is enabled (API limitation)")
-        
-        # Enable web_search via tools parameter if needed
-        # According to LangChain docs, web_search_preview can be enabled via tools parameter
-        if use_web_search and model_provider_enum == ModelProvider.OPENAI:
-            try:
-                # Try enabling web_search_preview via tools parameter
-                model_init_kwargs["tools"] = [{"type": "web_search_preview"}]
-                print(f"Web search enabled for {model_name} via tools parameter")
-            except Exception as e:
-                print(f"Could not enable web_search via tools parameter: {e}")
-                # Remove tools if it causes error
-                model_init_kwargs.pop("tools", None)
-        
-        # Create the model
-        try:
-            llm = ChatOpenAI(**model_init_kwargs)
-        except Exception as e:
-            print(f"Error creating ChatOpenAI with custom params: {e}")
-            # Fallback to standard model creation
+                # GPT-5 uses reasoning_effort - pass it explicitly, not in model_kwargs
+                llm = ChatOpenAI(
+                    model=model_name,
+                    api_key=api_key,
+                    base_url=base_url,
+                    reasoning_effort=reasoning_depth.lower()  # Pass explicitly
+                )
+                print(f"Configured reasoning_effort={reasoning_depth.lower()} for GPT-5")
+            else:
+                # Use standard model creation
+                llm = get_model(model_name, model_provider_enum, api_keys)
+        else:
             llm = get_model(model_name, model_provider_enum, api_keys)
         
-        # If web_search was enabled at model creation, use it directly
-        # Otherwise, try to bind tools
+        # Perform web search using Tavily
+        web_search_results = []
         if use_web_search:
-            # Check if web_search was already enabled via tools parameter
-            if hasattr(llm, 'tools') and llm.tools:
-                llm_with_tools = llm
-                print(f"Web search already enabled via model initialization")
-            else:
-                # Try to bind web_search tool
-                try:
-                    from langchain_openai.tools import WebSearchTool
-                    web_search_tool = WebSearchTool()
-                    llm_with_tools = llm.bind_tools([web_search_tool])
-                    print(f"Web search enabled for {model_name} using WebSearchTool via bind_tools")
-                except ImportError:
-                    # WebSearchTool not available, use model as-is
-                    llm_with_tools = llm
-                    print(f"Note: WebSearchTool not available. Web search may not be enabled.")
-                except Exception as e:
-                    print(f"Warning: Could not bind web_search tool: {e}")
-                    llm_with_tools = llm
-        else:
-            llm_with_tools = llm
-            if model_provider_enum != ModelProvider.OPENAI:
-                print(f"Note: Web search is currently only available for OpenAI models (gpt-4o, gpt-4o-mini, gpt-5). Using model knowledge only.")
-            else:
-                print(f"Note: Model {model_name} may not support web search. Using model knowledge only.")
+            try:
+                # Use Tavily Search API - optimized for AI/LLM use cases
+                from tavily import TavilyClient
+                
+                # Get Tavily API key from environment or api_keys
+                tavily_api_key = api_keys.get("TAVILY_API_KEY") if api_keys else None
+                if not tavily_api_key:
+                    tavily_api_key = os.environ.get("TAVILY_API_KEY")
+                
+                if not tavily_api_key:
+                    print("Warning: TAVILY_API_KEY not found. Skipping web search.")
+                    web_search_results = []
+                else:
+                    # Search queries for comprehensive stock information
+                    # Note: Only searching for recent news (last month)
+                    search_queries = [
+                        f"{symbol} stock news",
+                        f"{symbol} financial moves earnings acquisitions",
+                        f"{symbol} upcoming events earnings product launch conference",
+                        f"{symbol} regulatory decisions FDA approval",
+                        f"{symbol} analyst upgrades downgrades",
+                        f"{symbol} partnerships deals",
+                        f"{symbol} stock outlook forecast"
+                    ]
+                    
+                    # Calculate date threshold (1 month ago)
+                    from datetime import datetime, timedelta
+                    from urllib.parse import urlparse
+                    one_month_ago = datetime.now() - timedelta(days=30)
+                    
+                    print(f"Performing web search for {symbol} using Tavily...")
+                    tavily_client = TavilyClient(api_key=tavily_api_key)
+                    
+                    for query in search_queries:
+                        try:
+                            print(f"Searching: {query}")
+                            # Tavily search with max_results and search_depth
+                            response = tavily_client.search(
+                                query=query,
+                                max_results=10,
+                                search_depth="advanced",  # "basic" or "advanced"
+                                include_domains=None,  # Can specify domains to include
+                                exclude_domains=["yahoo.com", "finance.yahoo.com"]  # Exclude Yahoo
+                            )
+                            
+                            results = response.get("results", [])
+                            print(f"Got {len(results)} results for '{query}'")
+                            
+                            for result in results:
+                                url = result.get("url", "")
+                                title = result.get("title", "")
+                                content = result.get("content", "")  # Tavily provides content directly
+                                published_date = result.get("published_date")
+                                
+                                # Check if article is within last month
+                                should_include = True
+                                if published_date:
+                                    try:
+                                        from dateutil import parser as date_parser
+                                        # Map common timezone abbreviations to avoid warnings
+                                        tzinfos = {
+                                            'EST': -5*3600,  # Eastern Standard Time UTC-5
+                                            'EDT': -4*3600,  # Eastern Daylight Time UTC-4
+                                            'PST': -8*3600,  # Pacific Standard Time UTC-8
+                                            'PDT': -7*3600,  # Pacific Daylight Time UTC-7
+                                            'CST': -6*3600,  # Central Standard Time UTC-6
+                                            'CDT': -5*3600,  # Central Daylight Time UTC-5
+                                            'MST': -7*3600,  # Mountain Standard Time UTC-7
+                                            'MDT': -6*3600,  # Mountain Daylight Time UTC-6
+                                        }
+                                        
+                                        article_date = date_parser.parse(published_date, tzinfos=tzinfos)
+                                        
+                                        # Make sure one_month_ago is timezone-aware for comparison
+                                        if article_date.tzinfo is not None and one_month_ago.tzinfo is None:
+                                            from datetime import timezone
+                                            one_month_ago_aware = one_month_ago.replace(tzinfo=timezone.utc)
+                                        elif article_date.tzinfo is None and one_month_ago.tzinfo is not None:
+                                            from datetime import timezone
+                                            article_date = article_date.replace(tzinfo=timezone.utc)
+                                            one_month_ago_aware = one_month_ago
+                                        else:
+                                            one_month_ago_aware = one_month_ago
+                                        
+                                        # Check if article is within last month
+                                        if article_date < one_month_ago_aware:
+                                            should_include = False
+                                            print(f"Skipping article from {article_date.strftime('%Y-%m-%d')} (older than 1 month)")
+                                    except Exception as date_error:
+                                        # If date parsing fails, include the article to be safe
+                                        pass
+                                
+                                # Skip this result if article is too old
+                                if not should_include:
+                                    continue
+                                
+                                # Extract domain for source prioritization
+                                domain = urlparse(url).netloc.lower() if url else ""
+                                
+                                # Prioritize non-Yahoo sources
+                                priority_sources = ['reuters.com', 'bloomberg.com', 'cnbc.com', 'wsj.com', 
+                                                  'ft.com', 'seekingalpha.com', 'marketwatch.com', 'techcrunch.com',
+                                                  'sec.gov', 'prnewswire.com', 'businesswire.com']
+                                is_priority_source = any(ps in domain for ps in priority_sources)
+                                is_yahoo = 'yahoo.com' in domain or 'finance.yahoo.com' in domain
+                                
+                                # Use Tavily's content directly (already extracted), limit to 5000 chars
+                                full_text = content[:5000] + "..." if len(content) > 5000 else content
+                                
+                                web_search_results.append({
+                                    "title": title,
+                                    "snippet": content[:500] if content else "",  # Use first 500 chars as snippet
+                                    "url": url,
+                                    "full_text": full_text,  # Tavily provides content directly
+                                    "domain": domain,
+                                    "is_priority": is_priority_source,
+                                    "is_yahoo": is_yahoo
+                                })
+                        except Exception as e:
+                            print(f"Error searching for '{query}': {e}")
+                            import traceback
+                            traceback.print_exc()
+                            continue
+                    
+                    # Sort results: priority sources first, then non-Yahoo, then Yahoo
+                    web_search_results.sort(key=lambda x: (
+                        not x.get('is_priority', False),  # Priority sources first
+                        x.get('is_yahoo', False),  # Yahoo last
+                    ))
+                    
+                    print(f"Found {len(web_search_results)} web search results")
+                    yahoo_count = sum(1 for r in web_search_results if r.get('is_yahoo', False))
+                    priority_count = sum(1 for r in web_search_results if r.get('is_priority', False))
+                    print(f"  - Yahoo Finance: {yahoo_count}, Priority sources: {priority_count}")
+            except ImportError:
+                print("Warning: tavily-python package not installed. Install with: pip install tavily-python")
+                print("Get your API key from: https://tavily.com")
+                web_search_results = []
+            except Exception as e:
+                print(f"Error performing web search with Tavily: {e}")
+                import traceback
+                traceback.print_exc()
+                web_search_results = []
         
-        # Create prompt template
-        web_search_note = "Use your knowledge and reasoning to provide analysis." if not use_web_search else "Use web search capabilities to find current information."
+        llm_with_tools = llm  # No need for tool binding with Tavily
+        
+        # Create prompt template with web search results
+        web_search_context = ""
+        if web_search_results:
+            web_search_context = "\n\nWEB SEARCH RESULTS:\n"
+            for i, result in enumerate(web_search_results[:35], 1):  # Limit to 35 results
+                title = result.get('title', 'No title')
+                snippet = result.get('snippet', 'No snippet')
+                url = result.get('url', 'No URL')
+                full_text = result.get('full_text')
+                
+                web_search_context += f"\n[{i}] {title}\n"
+                web_search_context += f"   URL: {url}\n"
+                
+                # Use full article text if available, otherwise use snippet
+                if full_text:
+                    web_search_context += f"   Content: {full_text}\n"
+                else:
+                    web_search_context += f"   Snippet: {snippet}\n"
         
         template = ChatPromptTemplate.from_messages([
             (
                 "system",
-                f"""You are a financial analyst providing comprehensive stock analysis. 
-                Your task is to analyze all relevant information about a stock and provide 
-                a detailed analysis formatted as bullet points. {web_search_note}
+                """You are a financial analyst providing comprehensive stock analysis. 
+                Your task is to analyze web search results and extract factual, valuable information with sufficient context.
                 
-                Format your response as:
-                • [Statement/insight] - Source: [URL or reference]
-                • [Statement/insight] - Source: [URL or reference]
+                CRITICAL RULES:
+                1. Only include factual information found in the search results provided
+                2. Never include meta-commentary like "check the feed", "monitor for updates", "no information found", or asking for more sources
+                3. Provide context and details - include numbers, dates, and specific facts
+                4. MANDATORY SOURCE DIVERSIFICATION: 
+                   - Prioritize Yahoo Finance, Reuters, Bloomberg, CNBC, WSJ, Financial Times, Seeking Alpha, MarketWatch, TechCrunch, company press releases, regulatory filings
+                   - Never cite the same URL twice in the same category
+                5. Write clear, informative sentences with relevant context
+                6. If no valuable information exists for a category, omit that category entirely - do NOT mention lack of sources
+                7. Each bullet should be self-contained with enough detail to be meaningful
+                8. Include specific details like amounts, percentages, dates, company names, etc.
+                9. Work with the search results provided - do NOT ask for more sources or mention limitations
                 
-                IMPORTANT: Provide maximum 5 most important bullets per category. 
-                Prioritize quality and impact over quantity. Focus on the most actionable insights.
-                
-                Provide factual, current information based on your analysis."""
+                Format: • [Detailed factual statement with context] - Source: [URL]"""
             ),
             (
                 "human",
-                """Analyze the stock {symbol} and provide comprehensive information covering:
-                1. Relevant news and their implications (max 5 bullets)
-                2. Financial moves (acquisitions, earnings, dividends, buybacks, guidance, partnerships, etc.) (max 5 bullets)
-                3. Upcoming events (earnings dates, product launches, regulatory decisions, etc.) (max 5 bullets)
-                4. Daily technical analysis (max 5 bullets)
-                5. Short-term outlook (next 1-3 months) (max 5 bullets)
-                6. Long-term outlook (6-12 months) (max 5 bullets)
-                7. Any additional information that could impact the stock (max 5 bullets)
+                """Analyze the stock {symbol} using the web search results below. Extract factual, valuable information with sufficient context and detail.
 
-                IMPORTANT: 
-                - Format your response as bullet points organized by category
-                - Maximum 5 most important bullets per category (35 bullets total maximum)
-                - Prioritize the most impactful and actionable information
-                - Each bullet point should include a source or reference when possible
-                - Be specific, factual, and focus on actionable insights for investors
-                - Use the format: • [text] - Source: [URL or reference]
-                - If a category has fewer than 5 relevant items, that's fine - quality over quantity"""
+Categories (max 5 bullets each, only include if valuable information exists):
+1. Relevant news and their implications
+2. Financial moves (acquisitions, earnings, dividends, buybacks, guidance, partnerships)
+3. Upcoming events (earnings dates, product launches, regulatory decisions, conferences, analyst days, investor events)
+4. Short-term outlook (next 1-3 months)
+5. Long-term outlook (6-12 months)
+6. Additional information that could impact the stock
+
+REQUIREMENTS:
+- Write informative sentences with context - include specific details, numbers, dates, and facts
+- Each bullet must be factual and self-contained with enough detail
+- MANDATORY: Use DIFFERENT URLs for each bullet - even if from same domain, use different pages/articles
+- MANDATORY: Prioritize Yahoo Finance, Reuters, Bloomberg, CNBC, WSJ, Financial Times, Seeking Alpha, MarketWatch, TechCrunch, company websites, SEC filings
+- For upcoming events: include earnings dates, product launches, regulatory decisions, conferences, analyst days, investor meetings, and other relevant events
+- Omit categories with no valuable information - do NOT mention lack of sources or ask for more
+- Never mention "check feeds", "monitor for updates", "no information found", or ask for additional sources
+- Format: • [Detailed statement with context] - Source: [URL]
+- Maximum 5 bullets per category
+- Work with the provided search results - extract and present the information available
+
+Web search results:{web_search_context}"""
             )
         ])
         
         prompt = template.invoke({
-            "symbol": symbol
+            "symbol": symbol,
+            "web_search_context": web_search_context
         })
         
-        # Call LLM - OpenAI models will automatically use web_search tool when needed
-        # The model will decide when to search the web based on the prompt
+        # Call LLM with web search results as context
         print(f"Invoking LLM for {symbol} with model {model_name}...")
+        print(f"Using {len(web_search_results)} web search results as context")
         
-        # Call LLM - reasoning parameters are already configured in model creation
+        # Call LLM - web search results are already included in the prompt
         result = llm_with_tools.invoke(prompt)
-        print(f"LLM response type: {type(result)}")
-        print(f"LLM response attributes: {dir(result)}")
         
-        # Handle tool calls - if the model wants to use web_search, we need to execute it
-        if hasattr(result, 'tool_calls') and result.tool_calls:
-            # The model wants to use tools - OpenAI's Responses API should handle this automatically
-            # But if we get tool_calls, we might need to handle them
-            print(f"Model requested tool calls: {result.tool_calls}")
-            # Check if content is available despite tool calls
-            if hasattr(result, 'content') and result.content:
-                response_text = result.content
-                print(f"Got content despite tool calls: {len(response_text)} chars")
-            else:
-                # OpenAI's Responses API should handle tool execution automatically
-                # But if not, let's try a direct call
-                print("No content in tool call response, trying direct call without tool binding...")
-                try:
-                    result_direct = llm.invoke(prompt)
-                    if hasattr(result_direct, 'content'):
-                        response_text = result_direct.content
-                    else:
-                        response_text = str(result_direct)
-                except Exception as direct_error:
-                    print(f"Direct call also failed: {direct_error}")
-                    response_text = f"Error: Tool calls detected but unable to get response. Tool calls: {result.tool_calls}"
+        # Extract text content from response
+        if hasattr(result, 'content'):
+            response_text = result.content
+            print(f"Got content: {len(response_text) if response_text else 0} chars")
+        elif isinstance(result, str):
+            response_text = result
+            print(f"Got string response: {len(response_text)} chars")
         else:
-            # Extract text content
-            if hasattr(result, 'content'):
-                response_text = result.content
-                print(f"Got content: {len(response_text) if response_text else 0} chars")
-            elif isinstance(result, str):
-                response_text = result
-                print(f"Got string response: {len(response_text)} chars")
-            else:
-                response_text = str(result)
-                print(f"Converted to string: {len(response_text)} chars")
+            response_text = str(result)
+            print(f"Converted to string: {len(response_text)} chars")
         
         if not response_text or (isinstance(response_text, str) and len(response_text.strip()) == 0):
             print(f"Warning: Empty response from LLM for {symbol}")
