@@ -743,11 +743,16 @@ def _analyze_news_with_llm(
                 4. MANDATORY SOURCE DIVERSIFICATION: 
                    - Prioritize Yahoo Finance, Reuters, Bloomberg, CNBC, WSJ, Financial Times, Seeking Alpha, MarketWatch, TechCrunch, company press releases, regulatory filings
                    - Never cite the same URL twice in the same category
-                5. Write clear, informative sentences with relevant context
-                6. If no valuable information exists for a category, omit that category entirely - do NOT mention lack of sources
-                7. Each bullet should be self-contained with enough detail to be meaningful
-                8. Include specific details like amounts, percentages, dates, company names, etc.
-                9. Work with the search results provided - do NOT ask for more sources or mention limitations
+                5. NO DUPLICATION ACROSS CATEGORIES: 
+                   - Each piece of information should appear in ONLY ONE category, even if it could fit multiple categories
+                   - If information appears in "Relevant news", do NOT repeat it in "Financial moves" or other categories
+                   - Choose the most appropriate category for each piece of information and use it there only
+                   - Example: A buyback authorization should appear in "Financial moves" OR "Relevant news", but NOT both
+                6. Write clear, informative sentences with relevant context
+                7. If no valuable information exists for a category, omit that category entirely - do NOT mention lack of sources
+                8. Each bullet should be self-contained with enough detail to be meaningful
+                9. Include specific details like amounts, percentages, dates, company names, etc.
+                10. Work with the search results provided - do NOT ask for more sources or mention limitations
                 
                 Format: • [Detailed factual statement with context] - Source: [URL]"""
             ),
@@ -768,6 +773,7 @@ REQUIREMENTS:
 - Each bullet must be factual and self-contained with enough detail
 - MANDATORY: Use DIFFERENT URLs for each bullet - even if from same domain, use different pages/articles
 - MANDATORY: Prioritize Yahoo Finance, Reuters, Bloomberg, CNBC, WSJ, Financial Times, Seeking Alpha, MarketWatch, TechCrunch, company websites, SEC filings
+- CRITICAL: NO DUPLICATION - Each piece of information must appear in ONLY ONE category. If a buyback appears in "Financial moves", do NOT also include it in "Relevant news". Choose the most appropriate category for each fact.
 - For upcoming events: include earnings dates, product launches, regulatory decisions, conferences, analyst days, investor meetings, and other relevant events
 - Omit categories with no valuable information - do NOT mention lack of sources or ask for more
 - Never mention "check feeds", "monitor for updates", "no information found", or ask for additional sources
