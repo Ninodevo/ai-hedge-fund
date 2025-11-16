@@ -380,7 +380,86 @@ def collect_volatility_and_beta(symbol: str, start_date: str, end_date: str) -> 
     }
 
 
-def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str = "ttm") -> Dict[str, Any]:
+def _parse_analysis_by_category(analysis_text: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Parse the analysis text and group results by category.
+    
+    Args:
+        analysis_text: The raw analysis text from LLM
+        
+    Returns:
+        Dictionary with category keys and dicts containing category_name and items list
+    """
+    if not analysis_text:
+        return {}
+    
+    # Category mapping from numbers/names to standardized keys
+    category_patterns = [
+        (r"^1\.?\s*(?:relevant\s+news|relevant\s+news\s+and\s+their\s+implications)", "relevant_news"),
+        (r"^2\.?\s*(?:financial\s+moves)", "financial_moves"),
+        (r"^3\.?\s*(?:upcoming\s+events)", "upcoming_events"),
+        (r"^4\.?\s*(?:short[- ]term\s+outlook)", "short_term_outlook"),
+        (r"^5\.?\s*(?:long[- ]term\s+outlook)", "long_term_outlook"),
+    ]
+    
+    # Category display names
+    category_names = {
+        "relevant_news": "Relevant news and their implications",
+        "financial_moves": "Financial moves",
+        "upcoming_events": "Upcoming events",
+        "short_term_outlook": "Short-term outlook",
+        "long_term_outlook": "Long-term outlook",
+    }
+    
+    import re
+    
+    result = {}
+    lines = analysis_text.split('\n')
+    current_category = None
+    current_bullets = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Check if this line starts a new category
+        category_found = False
+        line_lower = line.lower()
+        
+        for pattern, cat_key in category_patterns:
+            if re.match(pattern, line_lower):
+                # Save previous category if exists
+                if current_category and current_bullets:
+                    result[current_category] = {
+                        "category_name": category_names.get(current_category, current_category),
+                        "items": current_bullets
+                    }
+                # Start new category
+                current_category = cat_key
+                current_bullets = []
+                category_found = True
+                break
+        
+        # If it's a bullet point (starts with • or -)
+        if not category_found and (line.startswith('•') or line.startswith('-')):
+            if current_category:
+                # Remove bullet marker and clean up
+                bullet_text = line.lstrip('•-').strip()
+                if bullet_text:
+                    current_bullets.append(bullet_text)
+    
+    # Save last category
+    if current_category and current_bullets:
+        result[current_category] = {
+            "category_name": category_names.get(current_category, current_category),
+            "items": current_bullets
+        }
+    
+    return result
+
+
+def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str = "ttm", api_keys: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """
     Collect enriched stock data including valuation, growth, and quality metrics.
     
@@ -388,6 +467,7 @@ def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str 
         symbol: Stock ticker symbol
         months_back: Number of months of historical data to include
         period_type: "ttm" or "quarterly" - which period type to use for financial metrics
+        api_keys: Optional dictionary of API keys for LLM calls
     """
     end_date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
     start_date = (datetime.datetime.utcnow() - datetime.timedelta(days=30 * months_back)).strftime("%Y-%m-%d")
@@ -403,7 +483,28 @@ def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str 
     valuation = collect_valuation_metrics(symbol, end_date, period_type=period_type, provenance=provenance, cik=cik)
     growth_profit = collect_growth_profit_quality(symbol, end_date, period_type=period_type, provenance=provenance, cik=cik)
     vol_beta = collect_volatility_and_beta(symbol, start_date, end_date)
-    news_data = collect_latest_news(symbol, days_back=30, max_items=20, analyze=True)
+    
+    # Use _analyze_news_with_llm directly instead of collect_latest_news
+    news_analysis_result = None
+    news_analysis_grouped = {}
+    try:
+        print(f"Analyzing news for {symbol} using LLM with web search...")
+        news_analysis_result = _analyze_news_with_llm(
+            symbol,
+            news_items=[],  # Not used, kept for compatibility
+            api_keys=api_keys
+        )
+        
+        # Parse and group analysis by category
+        if news_analysis_result and isinstance(news_analysis_result, dict):
+            analysis_text = news_analysis_result.get("analysis")
+            if analysis_text:
+                news_analysis_grouped = _parse_analysis_by_category(analysis_text)
+                print(f"News analysis completed for {symbol}, found {len(news_analysis_grouped)} categories")
+    except Exception as e:
+        import traceback
+        print(f"Error analyzing news for {symbol}: {e}")
+        traceback.print_exc()
 
     # Extract next_report_estimated from valuation if available
     next_report_estimated = valuation.get("next_report_estimated") if valuation else None
@@ -413,8 +514,12 @@ def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str 
         "valuation": valuation,
         **growth_profit,
         **vol_beta,
-        "news": news_data.get("items", []),  # Keep backward compatibility with list of items
-        # "news_analysis": news_data.get("analysis"),  # Add analysis separately - will be None if analysis failed
+        "news_analysis": {
+            "raw": news_analysis_result.get("analysis") if news_analysis_result and isinstance(news_analysis_result, dict) else None,
+            "grouped_by_category": news_analysis_grouped,
+            "token_usage": news_analysis_result.get("token_usage") if news_analysis_result and isinstance(news_analysis_result, dict) else None,
+            "cost_usd": news_analysis_result.get("cost_usd") if news_analysis_result and isinstance(news_analysis_result, dict) else None,
+        },
         "next_report_estimated": next_report_estimated,  # Estimated next report/filing date
         "data_provenance": {
             "parameters": provenance.get_provenance(),
@@ -766,7 +871,6 @@ Categories (max 5 bullets each, only include if valuable information exists):
 3. Upcoming events (earnings dates, product launches, regulatory decisions, conferences, analyst days, investor events)
 4. Short-term outlook (next 1-3 months)
 5. Long-term outlook (6-12 months)
-6. Additional information that could impact the stock
 
 REQUIREMENTS:
 - Write informative sentences with context - include specific details, numbers, dates, and facts

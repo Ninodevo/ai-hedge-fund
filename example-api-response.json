@@ -1,0 +1,849 @@
+{
+    "symbol": "TSLA",
+    "persona": "warren_buffet",
+    "period_type": "quarterly",
+    "price": {
+        "snapshot": {
+            "ticker": "TSLA",
+            "price": 404.35,
+            "day_change": 2.34,
+            "day_change_percent": 0.58,
+            "volume": 105496972.0,
+            "time": "2025-11-15T01:01:00Z",
+            "time_milliseconds": 1763168460000,
+            "market_cap": 1304210258267.1501
+        }
+    },
+    "summary": {
+        "TSLA": {
+            "signal": "bearish",
+            "confidence": 20,
+            "reasoning": "Valuation: The company appears materially overvalued on the provided figures — intrinsic_value_per_share = 30.523729269165752 versus current_price_per_share = 416.9326585092418, and intrinsic_value (98,452,728,659.37) is far below market_cap (1,344,794,980,172.45). The stated margin_of_safety (-0.9267897857215012) does not meet the required MOS (0.433333...), and the required buy price per share (17.296779919193927) is well below the current price. Business quality / moat: Evidence is mixed. There are signs of operational strength (efficient asset utilization; 12 of 20 periods with ROE >15%; consistent book value per share growth, book value CAGR 6.3%), but low average operating margins (avg 11.0%; recent 7.5%) and declining gross margins indicate limited pricing power and margin pressure, which weakens any durable moat. Fundamentals & financial strength: Weak trailing ROE (6.9%) and a relatively elevated debt-to-equity ratio (0.7) are concerning, although liquidity is described as good. Earnings growth is inconsistent despite large total growth over 20 periods (631.1%), which raises predictability concerns. Management: Recent common stock issuance (potential dilution) and minimal/no dividends weigh negatively on shareholder-friendly capital allocation. Checklist summary: - Circle of competence / moat: mixed — some operational strengths but limited pricing power. - Management quality: caution due to dilution and lack of dividends. - Financial strength: mixed — good liquidity but leverage and weak current ROE. - Valuation vs intrinsic: clearly unfavorable. - Long-term prospects: uncertain given margin pressure and inconsistent earnings. Given the clearly unfavorable valuation relative to intrinsic value and the mixed-to-weak fundamentals/management signals, the appropriate stance is bearish."
+        }
+    },
+    "analyst_signals": {
+        "warren_buffett_agent": {
+            "TSLA": {
+                "signal": "bearish",
+                "confidence": 20,
+                "reasoning": "Valuation: The company appears materially overvalued on the provided figures — intrinsic_value_per_share = 30.523729269165752 versus current_price_per_share = 416.9326585092418, and intrinsic_value (98,452,728,659.37) is far below market_cap (1,344,794,980,172.45). The stated margin_of_safety (-0.9267897857215012) does not meet the required MOS (0.433333...), and the required buy price per share (17.296779919193927) is well below the current price. Business quality / moat: Evidence is mixed. There are signs of operational strength (efficient asset utilization; 12 of 20 periods with ROE >15%; consistent book value per share growth, book value CAGR 6.3%), but low average operating margins (avg 11.0%; recent 7.5%) and declining gross margins indicate limited pricing power and margin pressure, which weakens any durable moat. Fundamentals & financial strength: Weak trailing ROE (6.9%) and a relatively elevated debt-to-equity ratio (0.7) are concerning, although liquidity is described as good. Earnings growth is inconsistent despite large total growth over 20 periods (631.1%), which raises predictability concerns. Management: Recent common stock issuance (potential dilution) and minimal/no dividends weigh negatively on shareholder-friendly capital allocation. Checklist summary: - Circle of competence / moat: mixed — some operational strengths but limited pricing power. - Management quality: caution due to dilution and lack of dividends. - Financial strength: mixed — good liquidity but leverage and weak current ROE. - Valuation vs intrinsic: clearly unfavorable. - Long-term prospects: uncertain given margin pressure and inconsistent earnings. Given the clearly unfavorable valuation relative to intrinsic value and the mixed-to-weak fundamentals/management signals, the appropriate stance is bearish."
+            }
+        }
+    },
+    "analysis_details": {
+        "warren_buffett_agent": {
+            "TSLA": {
+                "analysis_data": {
+                    "score": 6,
+                    "max_score": 27,
+                    "market_cap": 1344794980176.4502,
+                    "margin_of_safety": -0.9267897857215012,
+                    "intrinsic_value": 98452728659.36746,
+                    "current_price_per_share": 416.9326585092418,
+                    "intrinsic_value_per_share": 30.523729269165752,
+                    "required_mos": 0.43333333333333335,
+                    "required_mos_on_price_basis": 0.7647058823529412,
+                    "required_mos_buy_price_per_share": 17.296779919193927
+                },
+                "analysis_details": [
+                    {
+                        "label": "fundamentals",
+                        "detail": [
+                            "Weak ROE of 6.9%",
+                            "High debt to equity ratio of 0.7",
+                            "Weak operating margin of 7.5%",
+                            "Good liquidity position"
+                        ],
+                        "data": {
+                            "return_on_equity": 0.069,
+                            "debt_to_equity": 0.663,
+                            "operating_margin": 0.07478590026455303,
+                            "current_ratio": 2.066,
+                            "date": "2025-09-30"
+                        },
+                        "score": 1,
+                        "max_score": 10
+                    },
+                    {
+                        "label": "consistency",
+                        "detail": [
+                            "Inconsistent earnings growth pattern",
+                            "Total earnings growth of 631.1% over past 20 periods"
+                        ],
+                        "data": {
+                            "earnings_values": [
+                                5271000000.0,
+                                6071000000.0,
+                                6299000000.0,
+                                7091000000.0,
+                                12891000000.0,
+                                12571000000.0,
+                                13874000000.0,
+                                14997000000.0,
+                                10756000000.0,
+                                12195000000.0,
+                                11751000000.0,
+                                12556000000.0,
+                                11190000000.0,
+                                9516000000.0,
+                                8399000000.0,
+                                5519000000.0,
+                                3468000000.0,
+                                2181000000.0,
+                                1143000000.0,
+                                721000000.0
+                            ],
+                            "earnings_dates": [
+                                "2025-09-30",
+                                "2025-06-30",
+                                "2025-03-31",
+                                "2024-12-31",
+                                "2024-09-30",
+                                "2024-06-30",
+                                "2024-03-31",
+                                "2023-12-31",
+                                "2023-09-30",
+                                "2023-06-30",
+                                "2023-03-31",
+                                "2022-12-31",
+                                "2022-09-30",
+                                "2022-06-30",
+                                "2022-03-31",
+                                "2021-12-31",
+                                "2021-09-30",
+                                "2021-06-30",
+                                "2021-03-31",
+                                "2020-12-31"
+                            ],
+                            "earnings_growth_monotonic": true
+                        },
+                        "score": 0
+                    },
+                    {
+                        "label": "moat",
+                        "detail": [
+                            "Good ROE performance: 12/20 periods >15%",
+                            "Low operating margins (avg: 11.0%) suggest limited pricing power",
+                            "Efficient asset utilization suggests operational moat"
+                        ],
+                        "data": {
+                            "historical_roes": [
+                                0.069,
+                                0.082,
+                                0.089,
+                                0.104,
+                                0.196,
+                                0.204,
+                                0.24,
+                                0.279,
+                                0.218,
+                                0.265,
+                                0.278,
+                                0.324,
+                                0.319,
+                                0.298,
+                                0.289,
+                                0.21,
+                                0.143,
+                                0.101,
+                                0.064,
+                                0.05
+                            ],
+                            "historical_margins": [
+                                0.07478590026455303,
+                                0.08628127696289906,
+                                0.08608081567840876,
+                                0.09497389702118948,
+                                0.09171384457025218,
+                                0.08498919406617847,
+                                0.0981371048604148,
+                                0.10490529383195726,
+                                0.12417121888161461,
+                                0.14360615986727357,
+                                0.15060149938978323,
+                                0.1703739166728045,
+                                0.16786663638913749,
+                                0.16204627341214306,
+                                0.15610226724553786,
+                                0.12241978336398937,
+                                0.09614071038251366,
+                                0.07684773780516936,
+                                0.06065664997217585,
+                                0.05584094368340944
+                            ],
+                            "asset_turnovers": [
+                                0.751,
+                                0.748,
+                                0.798,
+                                0.842,
+                                0.866,
+                                0.902,
+                                0.947,
+                                1.024,
+                                1.085,
+                                1.125,
+                                1.103,
+                                1.119,
+                                1.105,
+                                1.056,
+                                1.032,
+                                0.944,
+                                0.859,
+                                0.813,
+                                0.761,
+                                0.728
+                            ],
+                            "dates": [
+                                "2025-09-30",
+                                "2025-06-30",
+                                "2025-03-31",
+                                "2024-12-31",
+                                "2024-09-30",
+                                "2024-06-30",
+                                "2024-03-31",
+                                "2023-12-31",
+                                "2023-09-30",
+                                "2023-06-30",
+                                "2023-03-31",
+                                "2022-12-31",
+                                "2022-09-30",
+                                "2022-06-30",
+                                "2022-03-31",
+                                "2021-12-31",
+                                "2021-09-30",
+                                "2021-06-30",
+                                "2021-03-31",
+                                "2020-12-31"
+                            ]
+                        },
+                        "score": 2,
+                        "max_score": 5
+                    },
+                    {
+                        "label": "management",
+                        "detail": [
+                            "Recent common stock issuance (potential dilution)",
+                            "No or minimal dividends paid"
+                        ],
+                        "data": {
+                            "issuance_or_purchase_of_equity_shares": 1493000000.0,
+                            "dividends_and_other_cash_distributions": 0.0,
+                            "outstanding_shares": 3225448889.0,
+                            "date": "2025-09-30"
+                        },
+                        "score": 0,
+                        "max_score": 2
+                    },
+                    {
+                        "label": "pricing_power",
+                        "detail": [
+                            "Declining gross margins may indicate pricing pressure"
+                        ],
+                        "data": {
+                            "gross_margins": [
+                                0.17006681793941422,
+                                0.1747950819672131,
+                                0.17662237265471564,
+                                0.17862626676220697,
+                                0.1822851260936696,
+                                0.17719633227721943,
+                                0.17779302337854241,
+                                0.18248891736331416,
+                                0.19806304991451565,
+                                0.21486153060790403,
+                                0.23134770732841287,
+                                0.25598438535759005,
+                                0.2661261237193273,
+                                0.2709853199535479,
+                                0.2709599614085866,
+                                0.25279155751258753,
+                                0.23106642759562843,
+                                0.22043858391858964,
+                                0.21176961602671118,
+                                0.2102359208523592
+                            ],
+                            "dates": [
+                                "2025-09-30",
+                                "2025-06-30",
+                                "2025-03-31",
+                                "2024-12-31",
+                                "2024-09-30",
+                                "2024-06-30",
+                                "2024-03-31",
+                                "2023-12-31",
+                                "2023-09-30",
+                                "2023-06-30",
+                                "2023-03-31",
+                                "2022-12-31",
+                                "2022-09-30",
+                                "2022-06-30",
+                                "2022-03-31",
+                                "2021-12-31",
+                                "2021-09-30",
+                                "2021-06-30",
+                                "2021-03-31",
+                                "2020-12-31"
+                            ]
+                        },
+                        "score": 0,
+                        "max_score": 5
+                    },
+                    {
+                        "label": "book_value",
+                        "detail": [
+                            "Consistent book value per share growth (Buffett's favorite metric)",
+                            "Book value CAGR: 6.3%"
+                        ],
+                        "data": {
+                            "book_values": [
+                                24.79344821513927,
+                                24.003430948847505,
+                                23.20926615381083,
+                                22.713908071949636,
+                                21.890100579598407,
+                                20.841615416377742,
+                                20.214203012162734,
+                                19.70290935073959,
+                                16.84501991288443,
+                                16.13186010943987,
+                                15.187244075488687,
+                                14.156904545876262,
+                                12.717849357963146,
+                                11.70387757948683,
+                                10.993307205230312,
+                                10.020265052550101,
+                                9.108614745741768,
+                                8.582724668534508,
+                                7.993233656344847,
+                                7.815515987509352
+                            ],
+                            "dates": [
+                                "2025-09-30",
+                                "2025-06-30",
+                                "2025-03-31",
+                                "2024-12-31",
+                                "2024-09-30",
+                                "2024-06-30",
+                                "2024-03-31",
+                                "2023-12-31",
+                                "2023-09-30",
+                                "2023-06-30",
+                                "2023-03-31",
+                                "2022-12-31",
+                                "2022-09-30",
+                                "2022-06-30",
+                                "2022-03-31",
+                                "2021-12-31",
+                                "2021-09-30",
+                                "2021-06-30",
+                                "2021-03-31",
+                                "2020-12-31"
+                            ]
+                        },
+                        "score": 3,
+                        "max_score": 5
+                    },
+                    {
+                        "label": "intrinsic_value",
+                        "detail": [
+                            "Using three-stage DCF: Stage 1 (7.7%, 20y), Stage 2 (3.9%, 20y), Terminal (2.5%)",
+                            "Stage 1 PV: $59,781,551,015",
+                            "Stage 2 PV: $28,120,531,234",
+                            "Terminal PV: $10,550,646,410",
+                            "Total IV: $98,452,728,659",
+                            "Intrinsic value per share: $30.52",
+                            "Owner earnings: $3,695,100,000",
+                            "Discount rate: 10.0%"
+                        ],
+                        "data": {
+                            "historical_earnings": [
+                                5271000000.0,
+                                6071000000.0,
+                                6299000000.0,
+                                7091000000.0,
+                                12891000000.0,
+                                12571000000.0,
+                                13874000000.0,
+                                14997000000.0,
+                                10756000000.0,
+                                12195000000.0,
+                                11751000000.0,
+                                12556000000.0,
+                                11190000000.0,
+                                9516000000.0,
+                                8399000000.0,
+                                5519000000.0,
+                                3468000000.0,
+                                2181000000.0,
+                                1143000000.0,
+                                721000000.0
+                            ],
+                            "owner_earnings": 3695100000.0,
+                            "owner_earnings_components": {
+                                "net_income": 5271000000.0,
+                                "depreciation": 6001000000.0,
+                                "maintenance_capex": 7576900000.0,
+                                "working_capital_change": 0,
+                                "total_capex": 8914000000.0
+                            },
+                            "stage_pv": {
+                                "stage1": 59781551015.27854,
+                                "stage2": 28120531234.44752,
+                                "terminal": 10550646409.641396
+                            },
+                            "discount_rate": 0.1,
+                            "dates": [
+                                "2025-09-30",
+                                "2025-06-30",
+                                "2025-03-31",
+                                "2024-12-31",
+                                "2024-09-30",
+                                "2024-06-30",
+                                "2024-03-31",
+                                "2023-12-31",
+                                "2023-09-30",
+                                "2023-06-30",
+                                "2023-03-31",
+                                "2022-12-31",
+                                "2022-09-30",
+                                "2022-06-30",
+                                "2022-03-31",
+                                "2021-12-31",
+                                "2021-09-30",
+                                "2021-06-30",
+                                "2021-03-31",
+                                "2020-12-31"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "enriched": {
+        "quick_facts": {
+            "ticker": "TSLA",
+            "name": "Tesla Inc",
+            "sector": "Consumer Discretionary",
+            "industry": "Automobiles",
+            "exchange": "NASDAQ",
+            "location": "California; U.S.A",
+            "market_cap": 1344794980176.4502
+        },
+        "valuation": {
+            "pe": 272.135,
+            "ev_ebitda": 108.42,
+            "ps": 14.999,
+            "p_fcf": 359.50416789874686,
+            "ev": 1426054629916.0,
+            "date_reported": "2025-09-30",
+            "fiscal_period": "2025-Q3",
+            "next_report_estimated": "2026-02-14"
+        },
+        "growth": {
+            "revenue_cagr_3y": 0.24888869132290184,
+            "eps_cagr_3y": 0.16986993982988682,
+            "fcf_cagr_3y": 26.328767123287673
+        },
+        "profit_quality": {
+            "fcf_margin": 1.236,
+            "cfo_to_net_income": 0.19936081815276446
+        },
+        "date_reported": "2025-09-30",
+        "fiscal_period": "2025-Q3",
+        "volatility": {
+            "sharpe_1y": 0.5326845893417412,
+            "sortino_1y": 0.8486786245177065,
+            "max_drawdown_1y_pct": -53.76568165715003
+        },
+        "beta": 2.28586347697052,
+        "news_analysis": {
+            "raw": "1. Relevant news and their implications\n• Tesla CEO Elon Musk said he is planning a “mega” AI chip fabrication effort and has discussed partnerships with Taiwan’s TSMC and South Korea’s Samsung for Tesla’s in‑house AI chips; Musk also said he’s open to talks with Intel — report published Nov. 7, 2025. - Source: https://www.reuters.com/business/autos-transportation/musk-plans-tesla-mega-ai-chip-fab-mulls-potential-intel-partnership-2025-11-07/  \n• Multiple outlets reported Tesla is developing support for Apple’s CarPlay for its vehicles (article flagged on CNBC aggregators), indicating potential new in‑car software integrations beyond Tesla’s native UI — item surfaced in current news listings. - Source: https://www.cnbc.com/quotes/TSLA  \n• Seeking Alpha’s analyst‑news roundup (Nov. 7, 2025) noted analyst upgrades to Tesla, with firms citing growth opportunities in software subscription offerings and energy solutions as drivers for the upgrades. - Source: https://seekingalpha.com/news/4518609-sa-analyst-upgradesdowngrades-tsla-acb-ups-pltr\n\n2. Financial moves (acquisitions, earnings, dividends, buybacks, guidance, partnerships)\n• Tesla’s Q3 2025 results (reported Oct. 22, 2025) showed revenue increased 12% year‑over‑year to $28.1 billion while net income fell about 37% to $1.37 billion (approximately $0.39 per share); the company said higher capital expenditures contributed to earnings missing estimates. - Source: https://www.cnbc.com/2025/10/22/tesla-tsla-q3-2025-earnings-report.html  \n• In its Q2 2025 update letter (posted July 23, 2025), Tesla reported total revenues of $22.496 billion, GAAP EPS of $0.33, non‑GAAP EPS of $0.40, and quarter‑end cash, cash equivalents and investments of $36.8 billion. - Source: https://www.teslarati.com/tesla-tsla-q2-2025-earnings-results/  \n• At Tesla’s annual meeting (Nov. 6, 2025), shareholders voted to approve a new compensation package for CEO Elon Musk (the company disclosed the vote at the annual meeting). - Source: https://www.morningstar.com/stocks/xnas/tsla/quote  \n• Bloomberg’s Oct. 22, 2025 live coverage of Tesla’s Q3 call reported operating profit fell about 40% year‑over‑year, cited roughly $400 million in tariff impacts, said Tesla had record vehicle deliveries and energy‑storage installations, reported cash of $41.6 billion, and noted days of inventory fell to 10 from 24 the prior quarter. - Source: https://www.bloomberg.com/news/live-blog/2025-10-22/tesla-third-quarter-earnings\n\n3. Upcoming events (earnings dates, product launches, regulatory decisions, conferences, analyst days, investor events)\n• MarketScreener lists projected earnings‑release dates for Tesla’s upcoming quarters, including a projected Q4 2025 earnings release on Jan. 27, 2026 and projected Q1 2026 release on Apr. 27, 2026 (calendar of projected release dates for 2026). - Source: https://www.marketscreener.com/quote/stock/TESLA-INC-6344549/calendar/  \n• AlphaQuery’s earnings history page shows Tesla announced Q3 2025 EPS on Oct. 22, 2025 and lists the next expected quarterly earnings announcement for Q4 2025 as Feb. 4, 2026 with an average estimated EPS of $0.33 for that quarter. - Source: https://www.alphaquery.com/stock/TSLA/earnings-history\n\n4. Short-term outlook (next 1-3 months)\n• Over the most recent four‑week window, TradingEconomics recorded Tesla shares hitting a 4‑week low of $413.72 on Nov. 13, 2025 and a 4‑week high of $467.04 on Nov. 3, 2025, indicating elevated short‑term price volatility in November 2025. - Source: https://tradingeconomics.com/tsla:us  \n• MarketWatch’s analyst estimates page shows recent analyst activity around early November 2025, including reiterations by firms such as Wedbush (dated 11/7/2025) and notes maintenance of ratings by Bank of America on 10/29/2025, reflecting active near‑term analyst coverage and mixed sentiment. - Source: https://www.marketwatch.com/investing/stock/tsla/analystestimates?gaa_at=eafs&gaa_n=AWEtsqcdruBsnwwlzT8ANkMs_hz0SZvxD_87Bj4dpK2Ia66KGe1Ae2_cnxje&gaa_ts=69189c30&gaa_sig=8uG7hUuFP8Hi4dcMgXs2GmpI26Q0HKz1354xVDoEwokWvrZNXTnc8eHFdxjmjnxIfjqQlQqClMgKx2pWRt7J6A%3D%3D\n\n5. Long-term outlook (6-12 months)\n• A Forbes analysis (Apr. 23, 2025) highlighted Tesla’s reinvestment strategy, noting retained earnings rose to over $35 billion (up 26% year‑over‑year in 2024) and citing cash reserves of roughly $37 billion, underscoring Tesla’s emphasis on reinvestment rather than dividends or buybacks. - Source: https://www.forbes.com/sites/gurufocus/2025/04/23/tesla-a-long-term-growth-play-but-short-term-challenges-remain/  \n• StockAnalysis’s company snapshot (Nov. 13, 2025) lists Tesla market metrics including market capitalization ~$1.34 trillion, trailing‑twelve‑months revenue of $95.63 billion and net income (ttm) of $5.08 billion, which frame Tesla’s longer‑term valuation and profitability profile. - Source: https://stockanalysis.com/stocks/tsla/\n\n6. Additional information that could impact the stock\n• News aggregators (CNN Markets) list recurring investor‑alert notices from law firms and several shareholder class‑action reminders related to Tesla (examples cited include notices from April 2023 and later alerts), indicating ongoing or historical litigation risk and shareholder litigation activity. - Source: https://www.cnn.com/markets/stocks/TSLA",
+            "grouped_by_category": {
+                "relevant_news": {
+                    "category_name": "Relevant news and their implications",
+                    "items": [
+                        "Tesla CEO Elon Musk said he is planning a “mega” AI chip fabrication effort and has discussed partnerships with Taiwan’s TSMC and South Korea’s Samsung for Tesla’s in‑house AI chips; Musk also said he’s open to talks with Intel — report published Nov. 7, 2025. - Source: https://www.reuters.com/business/autos-transportation/musk-plans-tesla-mega-ai-chip-fab-mulls-potential-intel-partnership-2025-11-07/",
+                        "Multiple outlets reported Tesla is developing support for Apple’s CarPlay for its vehicles (article flagged on CNBC aggregators), indicating potential new in‑car software integrations beyond Tesla’s native UI — item surfaced in current news listings. - Source: https://www.cnbc.com/quotes/TSLA",
+                        "Seeking Alpha’s analyst‑news roundup (Nov. 7, 2025) noted analyst upgrades to Tesla, with firms citing growth opportunities in software subscription offerings and energy solutions as drivers for the upgrades. - Source: https://seekingalpha.com/news/4518609-sa-analyst-upgradesdowngrades-tsla-acb-ups-pltr"
+                    ]
+                },
+                "financial_moves": {
+                    "category_name": "Financial moves",
+                    "items": [
+                        "Tesla’s Q3 2025 results (reported Oct. 22, 2025) showed revenue increased 12% year‑over‑year to $28.1 billion while net income fell about 37% to $1.37 billion (approximately $0.39 per share); the company said higher capital expenditures contributed to earnings missing estimates. - Source: https://www.cnbc.com/2025/10/22/tesla-tsla-q3-2025-earnings-report.html",
+                        "In its Q2 2025 update letter (posted July 23, 2025), Tesla reported total revenues of $22.496 billion, GAAP EPS of $0.33, non‑GAAP EPS of $0.40, and quarter‑end cash, cash equivalents and investments of $36.8 billion. - Source: https://www.teslarati.com/tesla-tsla-q2-2025-earnings-results/",
+                        "At Tesla’s annual meeting (Nov. 6, 2025), shareholders voted to approve a new compensation package for CEO Elon Musk (the company disclosed the vote at the annual meeting). - Source: https://www.morningstar.com/stocks/xnas/tsla/quote",
+                        "Bloomberg’s Oct. 22, 2025 live coverage of Tesla’s Q3 call reported operating profit fell about 40% year‑over‑year, cited roughly $400 million in tariff impacts, said Tesla had record vehicle deliveries and energy‑storage installations, reported cash of $41.6 billion, and noted days of inventory fell to 10 from 24 the prior quarter. - Source: https://www.bloomberg.com/news/live-blog/2025-10-22/tesla-third-quarter-earnings"
+                    ]
+                },
+                "upcoming_events": {
+                    "category_name": "Upcoming events",
+                    "items": [
+                        "MarketScreener lists projected earnings‑release dates for Tesla’s upcoming quarters, including a projected Q4 2025 earnings release on Jan. 27, 2026 and projected Q1 2026 release on Apr. 27, 2026 (calendar of projected release dates for 2026). - Source: https://www.marketscreener.com/quote/stock/TESLA-INC-6344549/calendar/",
+                        "AlphaQuery’s earnings history page shows Tesla announced Q3 2025 EPS on Oct. 22, 2025 and lists the next expected quarterly earnings announcement for Q4 2025 as Feb. 4, 2026 with an average estimated EPS of $0.33 for that quarter. - Source: https://www.alphaquery.com/stock/TSLA/earnings-history"
+                    ]
+                },
+                "short_term_outlook": {
+                    "category_name": "Short-term outlook",
+                    "items": [
+                        "Over the most recent four‑week window, TradingEconomics recorded Tesla shares hitting a 4‑week low of $413.72 on Nov. 13, 2025 and a 4‑week high of $467.04 on Nov. 3, 2025, indicating elevated short‑term price volatility in November 2025. - Source: https://tradingeconomics.com/tsla:us",
+                        "MarketWatch’s analyst estimates page shows recent analyst activity around early November 2025, including reiterations by firms such as Wedbush (dated 11/7/2025) and notes maintenance of ratings by Bank of America on 10/29/2025, reflecting active near‑term analyst coverage and mixed sentiment. - Source: https://www.marketwatch.com/investing/stock/tsla/analystestimates?gaa_at=eafs&gaa_n=AWEtsqcdruBsnwwlzT8ANkMs_hz0SZvxD_87Bj4dpK2Ia66KGe1Ae2_cnxje&gaa_ts=69189c30&gaa_sig=8uG7hUuFP8Hi4dcMgXs2GmpI26Q0HKz1354xVDoEwokWvrZNXTnc8eHFdxjmjnxIfjqQlQqClMgKx2pWRt7J6A%3D%3D"
+                    ]
+                },
+                "long_term_outlook": {
+                    "category_name": "Long-term outlook",
+                    "items": [
+                        "A Forbes analysis (Apr. 23, 2025) highlighted Tesla’s reinvestment strategy, noting retained earnings rose to over $35 billion (up 26% year‑over‑year in 2024) and citing cash reserves of roughly $37 billion, underscoring Tesla’s emphasis on reinvestment rather than dividends or buybacks. - Source: https://www.forbes.com/sites/gurufocus/2025/04/23/tesla-a-long-term-growth-play-but-short-term-challenges-remain/",
+                        "StockAnalysis’s company snapshot (Nov. 13, 2025) lists Tesla market metrics including market capitalization ~$1.34 trillion, trailing‑twelve‑months revenue of $95.63 billion and net income (ttm) of $5.08 billion, which frame Tesla’s longer‑term valuation and profitability profile. - Source: https://stockanalysis.com/stocks/tsla/"
+                    ]
+                },
+                "additional_information": {
+                    "category_name": "Additional information",
+                    "items": [
+                        "News aggregators (CNN Markets) list recurring investor‑alert notices from law firms and several shareholder class‑action reminders related to Tesla (examples cited include notices from April 2023 and later alerts), indicating ongoing or historical litigation risk and shareholder litigation activity. - Source: https://www.cnn.com/markets/stocks/TSLA"
+                    ]
+                }
+            },
+            "token_usage": {
+                "completion_tokens": 5597,
+                "prompt_tokens": 11483,
+                "total_tokens": 17080,
+                "completion_tokens_details": {
+                    "accepted_prediction_tokens": 0,
+                    "audio_tokens": 0,
+                    "reasoning_tokens": 4160,
+                    "rejected_prediction_tokens": 0
+                },
+                "prompt_tokens_details": {
+                    "audio_tokens": 0,
+                    "cached_tokens": 0
+                }
+            },
+            "cost_usd": 0.070324
+        },
+        "next_report_estimated": "2026-02-14",
+        "data_provenance": {
+            "parameters": {
+                "market_cap": {
+                    "value": 1344794980176.4502,
+                    "source": "market_cap_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "name": {
+                    "value": "Tesla Inc",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "sector": {
+                    "value": "Consumer Discretionary",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "industry": {
+                    "value": "Automobiles",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "exchange": {
+                    "value": "NASDAQ",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "location": {
+                    "value": "California; U.S.A",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "sec_filings_url": {
+                    "value": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001318605",
+                    "source": "company_facts_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:13:25 UTC"
+                },
+                "pe": {
+                    "value": 272.135,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:26 UTC"
+                },
+                "ev_ebitda": {
+                    "value": 108.42,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:26 UTC"
+                },
+                "ps": {
+                    "value": 14.999,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:26 UTC"
+                },
+                "ev": {
+                    "value": 1426054629916.0,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:26 UTC"
+                },
+                "p_fcf": {
+                    "value": 359.50416789874686,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:27 UTC"
+                },
+                "revenue_growth": {
+                    "value": 0.24888869132290184,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "eps_growth": {
+                    "value": 0.16986993982988682,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "fcf_growth": {
+                    "value": 26.328767123287673,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "fcf_per_share": {
+                    "value": 1.236,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "operating_cash_flow_ratio": {
+                    "value": 0.19936081815276446,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "revenue_cagr_3y": {
+                    "value": 0.24888869132290184,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "eps_cagr_3y": {
+                    "value": 0.16986993982988682,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "fcf_cagr_3y": {
+                    "value": 26.328767123287673,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "fcf_margin": {
+                    "value": 1.236,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "cfo_to_net_income": {
+                    "value": 0.19936081815276446,
+                    "source": "financial_metrics_api",
+                    "date": "2025-09-30",
+                    "period_type": "quarterly",
+                    "is_latest": true,
+                    "report_period": "2025-09-30",
+                    "fiscal_period": "2025-Q3",
+                    "filing_url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828025045968/tsla-20250930.htm",
+                    "fetched_at": "2025-11-15 15:13:28 UTC"
+                },
+                "price_snapshot": {
+                    "value": {
+                        "ticker": "TSLA",
+                        "price": 404.35,
+                        "day_change": 2.34,
+                        "day_change_percent": 0.58,
+                        "volume": 105496972.0,
+                        "time": "2025-11-15T01:01:00Z",
+                        "time_milliseconds": 1763168460000,
+                        "market_cap": 1304210258267.1501
+                    },
+                    "source": "price_api",
+                    "date": "2025-11-15",
+                    "period_type": "latest",
+                    "is_latest": true,
+                    "report_period": null,
+                    "fiscal_period": null,
+                    "filing_url": null,
+                    "fetched_at": "2025-11-15 15:15:07 UTC"
+                }
+            },
+            "summary": {
+                "sources": {
+                    "market_cap_api": {
+                        "parameters": [
+                            "market_cap"
+                        ],
+                        "latest_date": "2025-11-15",
+                        "oldest_date": "2025-11-15"
+                    },
+                    "company_facts_api": {
+                        "parameters": [
+                            "name",
+                            "sector",
+                            "industry",
+                            "exchange",
+                            "location",
+                            "sec_filings_url"
+                        ],
+                        "latest_date": "2025-11-15",
+                        "oldest_date": "2025-11-15"
+                    },
+                    "financial_metrics_api": {
+                        "parameters": [
+                            "pe",
+                            "ev_ebitda",
+                            "ps",
+                            "ev",
+                            "p_fcf",
+                            "revenue_growth",
+                            "eps_growth",
+                            "fcf_growth",
+                            "fcf_per_share",
+                            "operating_cash_flow_ratio",
+                            "revenue_cagr_3y",
+                            "eps_cagr_3y",
+                            "fcf_cagr_3y",
+                            "fcf_margin",
+                            "cfo_to_net_income"
+                        ],
+                        "latest_date": "2025-09-30",
+                        "oldest_date": "2025-09-30"
+                    },
+                    "price_api": {
+                        "parameters": [
+                            "price_snapshot"
+                        ],
+                        "latest_date": "2025-11-15",
+                        "oldest_date": "2025-11-15"
+                    }
+                },
+                "total_parameters": 23,
+                "latest_data_count": 23,
+                "historical_data_count": 0
+            }
+        }
+    },
+    "backtest": null,
+    "disclaimer": "AI-generated content for educational and informational purposes only. Not investment advice; no trade execution; no guarantees."
+}
