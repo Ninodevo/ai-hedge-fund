@@ -462,7 +462,7 @@ def _parse_analysis_by_category(analysis_text: str) -> Dict[str, Dict[str, Any]]
     return result
 
 
-def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str = "ttm", api_keys: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str = "ttm", api_keys: Optional[Dict[str, str]] = None, include_news_analysis: bool = True) -> Dict[str, Any]:
     """
     Collect enriched stock data including valuation, growth, and quality metrics.
     
@@ -471,6 +471,7 @@ def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str 
         months_back: Number of months of historical data to include
         period_type: "ttm" or "quarterly" - which period type to use for financial metrics
         api_keys: Optional dictionary of API keys for LLM calls
+        include_news_analysis: Whether to include news analysis (default: True). Set to False to skip expensive news analysis.
     """
     end_date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
     start_date = (datetime.datetime.utcnow() - datetime.timedelta(days=30 * months_back)).strftime("%Y-%m-%d")
@@ -487,27 +488,28 @@ def collect_enriched_stock(symbol: str, months_back: int = 12, period_type: str 
     growth_profit = collect_growth_profit_quality(symbol, end_date, period_type=period_type, provenance=provenance, cik=cik)
     vol_beta = collect_volatility_and_beta(symbol, start_date, end_date)
     
-    # Use _analyze_news_with_llm directly instead of collect_latest_news
+    # News analysis (optional, expensive operation)
     news_analysis_result = None
     news_analysis_grouped = {}
-    try:
-        print(f"Analyzing news for {symbol} using LLM with web search...")
-        news_analysis_result = _analyze_news_with_llm(
-            symbol,
-            news_items=[],  # Not used, kept for compatibility
-            api_keys=api_keys
-        )
-        
-        # Parse and group analysis by category
-        if news_analysis_result and isinstance(news_analysis_result, dict):
-            analysis_text = news_analysis_result.get("analysis")
-            if analysis_text:
-                news_analysis_grouped = _parse_analysis_by_category(analysis_text)
-                print(f"News analysis completed for {symbol}, found {len(news_analysis_grouped)} categories")
-    except Exception as e:
-        import traceback
-        print(f"Error analyzing news for {symbol}: {e}")
-        traceback.print_exc()
+    if include_news_analysis:
+        try:
+            print(f"Analyzing news for {symbol} using LLM with web search...")
+            news_analysis_result = _analyze_news_with_llm(
+                symbol,
+                news_items=[],  # Not used, kept for compatibility
+                api_keys=api_keys
+            )
+            
+            # Parse and group analysis by category
+            if news_analysis_result and isinstance(news_analysis_result, dict):
+                analysis_text = news_analysis_result.get("analysis")
+                if analysis_text:
+                    news_analysis_grouped = _parse_analysis_by_category(analysis_text)
+                    print(f"News analysis completed for {symbol}, found {len(news_analysis_grouped)} categories")
+        except Exception as e:
+            import traceback
+            print(f"Error analyzing news for {symbol}: {e}")
+            traceback.print_exc()
 
     # Extract next_report_estimated from valuation if available
     next_report_estimated = valuation.get("next_report_estimated") if valuation else None

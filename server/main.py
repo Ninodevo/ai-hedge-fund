@@ -39,7 +39,7 @@ def _require(auth: Optional[str]):
     if auth != f"Bearer {API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-class ReportPayload(BaseModel):
+class AnalystAnalysisPayload(BaseModel):
     symbol: str
     persona: Optional[str] = None
     market: Optional[dict] = None
@@ -61,26 +61,21 @@ class NewsAnalysisPayload(BaseModel):
 @app.post("/v1/news-analysis")
 def analyze_news_endpoint(p: NewsAnalysisPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
     """
-    Test endpoint for news analysis with web search.
-    Allows testing different models and reasoning_depth settings.
+    Get news analysis for a stock using LLM with web search.
+    This endpoint provides comprehensive news analysis grouped by category.
+    Separate from analyst analysis to allow independent caching and cost control.
     """
     _require(authorization)
     symbol = p.symbol.upper()
     
-    # Import here to avoid circular imports
-    from server.collectors import collect_latest_news
-    
     try:
-
-        # The analysis is done inside collect_latest_news using _analyze_news_with_llm
-        # But we need to call it directly with our parameters
-        from server.collectors import _analyze_news_with_llm
+        from server.collectors import _analyze_news_with_llm, _parse_analysis_by_category
         
         analysis_result = _analyze_news_with_llm(
             symbol=symbol,
             news_items=[],
             api_keys=None,
-            model_name=p.model_name or "gpt-5",
+            model_name=p.model_name or "gpt-5-mini",
             model_provider=p.model_provider or "OPENAI",
             reasoning_depth=p.reasoning_depth
         )
@@ -93,6 +88,7 @@ def analyze_news_endpoint(p: NewsAnalysisPayload, authorization: Optional[str] =
                 "model_provider": p.model_provider,
                 "reasoning_depth": p.reasoning_depth,
                 "analysis": None,
+                "grouped_by_category": {},
                 "token_usage": None,
                 "cost_usd": None,
                 "status": "error",
@@ -104,12 +100,18 @@ def analyze_news_endpoint(p: NewsAnalysisPayload, authorization: Optional[str] =
         token_usage = analysis_result.get("token_usage") if isinstance(analysis_result, dict) else None
         cost_usd = analysis_result.get("cost_usd") if isinstance(analysis_result, dict) else None
         
+        # Parse and group analysis by category
+        grouped_by_category = {}
+        if analysis_text:
+            grouped_by_category = _parse_analysis_by_category(analysis_text)
+        
         return {
             "symbol": symbol,
             "model_name": p.model_name,
             "model_provider": p.model_provider,
             "reasoning_depth": p.reasoning_depth,
             "analysis": analysis_text,
+            "grouped_by_category": grouped_by_category,
             "token_usage": token_usage,
             "cost_usd": cost_usd,
             "status": "success"
@@ -179,18 +181,23 @@ def fetch_news_endpoint(p: NewsFetchPayload, authorization: Optional[str] = Head
             "traceback": error_details
         }
 
-@app.post("/v1/report")
-def generate_report(p: ReportPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
+@app.post("/v1/analyst-analysis")
+def get_analyst_analysis(p: AnalystAnalysisPayload, authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    Get analyst analysis for a stock using a specific investment persona.
+    This endpoint provides fundamental analysis, valuation, and investment signals.
+    For news analysis, use the /v1/news-analysis endpoint separately.
+    """
     _require(authorization)
     symbol  = p.symbol.upper()
     persona = (p.persona or DEFAULT_PERSONA).lower()
     period_type = (p.period_type or "ttm").lower()
     if period_type not in ["ttm", "quarterly"]:
         raise HTTPException(status_code=400, detail=f"period_type must be 'ttm' or 'quarterly', got '{period_type}'")
-    return _build_report(symbol, persona, p.months_back, period_type)
+    return _build_analyst_analysis(symbol, persona, p.months_back, period_type)
 
 
-def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, period_type: str = "ttm") -> dict:
+def _build_analyst_analysis(symbol: str, persona: str, months_back: Optional[int] = 12, period_type: str = "ttm") -> dict:
     # Local imports to avoid startup errors if optional deps aren't installed yet
     from src.main import run_hedge_fund
     from src.utils.analysts import ANALYST_CONFIG
@@ -242,44 +249,22 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, pe
     # Fetch latest price snapshot
     price_snapshot = _get_latest_price(symbol)
 
-    # Enriched fundamentals/valuation/volatility block
-    enriched = collect_enriched_stock(symbol, months_back or 12, period_type=period_type)
-    
-    # Add news analysis cost to cost summary if available
-    if enriched.get("news_analysis") and enriched["news_analysis"].get("cost_usd"):
-        news_cost = enriched["news_analysis"]["cost_usd"]
-        if "llm_costs" not in cost_summary:
-            cost_summary["llm_costs"] = {"total_usd": 0.0, "by_agent": {}}
-        if "total_usd" not in cost_summary["llm_costs"]:
-            cost_summary["llm_costs"]["total_usd"] = 0.0
-        if "by_agent" not in cost_summary["llm_costs"]:
-            cost_summary["llm_costs"]["by_agent"] = {}
-        
-        cost_summary["llm_costs"]["total_usd"] = round(
-            cost_summary["llm_costs"].get("total_usd", 0.0) + news_cost, 6
-        )
-        cost_summary["llm_costs"]["by_agent"]["news_analysis"] = news_cost
-        
-        # Update total cost
-        if "total_cost_usd" not in cost_summary:
-            cost_summary["total_cost_usd"] = 0.0
-        cost_summary["total_cost_usd"] = round(
-            cost_summary["total_cost_usd"] + news_cost, 6
-        )
+    # Enriched fundamentals/valuation/volatility block (without news analysis)
+    # enriched = collect_enriched_stock(symbol, months_back or 12, period_type=period_type, include_news_analysis=False)
     
     # Add price data to provenance if available
-    if price_snapshot and "data_provenance" in enriched:
-        from server.data_provenance import DataProvenance
-        price_provenance = DataProvenance()
-        price_provenance.add_price_data(price_snapshot, end_date)
-        # Merge price provenance into enriched provenance
-        enriched["data_provenance"]["parameters"].update(price_provenance.get_provenance())
-        # Recalculate summary with all parameters
-        temp_provenance = DataProvenance()
-        temp_provenance.provenance = enriched["data_provenance"]["parameters"]
-        enriched["data_provenance"]["summary"] = temp_provenance.get_summary()
+    # if price_snapshot and "data_provenance" in enriched:
+    #     from server.data_provenance import DataProvenance
+    #     price_provenance = DataProvenance()
+    #     price_provenance.add_price_data(price_snapshot, end_date)
+    #     # Merge price provenance into enriched provenance
+    #     enriched["data_provenance"]["parameters"].update(price_provenance.get_provenance())
+    #     # Recalculate summary with all parameters
+    #     temp_provenance = DataProvenance()
+    #     temp_provenance.provenance = enriched["data_provenance"]["parameters"]
+    #     enriched["data_provenance"]["summary"] = temp_provenance.get_summary()
     # TODO: Implement this, commented out to avoid billing
-    # enriched = {}
+    enriched = {}
 
     return {
         "symbol": symbol,

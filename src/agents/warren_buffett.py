@@ -3,8 +3,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 import json
+from typing import Optional
 from typing_extensions import Literal
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api import get_financial_metrics, get_market_cap, search_line_items, get_company_facts
+from src.utils.analyst_provenance import add_provenance_to_data, get_market_cap_provenance
 from src.utils.llm import call_llm
 from src.utils.progress import progress
 from src.utils.api_key import get_api_key_from_state
@@ -66,28 +68,32 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
         progress.update_status(agent_id, ticker, "Getting market cap")
         # Get current market cap
         market_cap = get_market_cap(ticker, end_date, api_key=api_key)
+        
+        # Get CIK for provenance tracking
+        company_facts_obj = get_company_facts(ticker)
+        cik = getattr(company_facts_obj, "cik", None) if company_facts_obj else None
 
         progress.update_status(agent_id, ticker, "Analyzing fundamentals")
         # Analyze fundamentals
-        fundamental_analysis = analyze_fundamentals(metrics)
+        fundamental_analysis = analyze_fundamentals(metrics, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing consistency")
-        consistency_analysis = analyze_consistency(financial_line_items)
+        consistency_analysis = analyze_consistency(financial_line_items, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing competitive moat")
-        moat_analysis = analyze_moat(metrics)
+        moat_analysis = analyze_moat(metrics, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing pricing power")
-        pricing_power_analysis = analyze_pricing_power(financial_line_items, metrics)
+        pricing_power_analysis = analyze_pricing_power(financial_line_items, metrics, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing book value growth")
-        book_value_analysis = analyze_book_value_growth(financial_line_items)
+        book_value_analysis = analyze_book_value_growth(financial_line_items, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing management quality")
-        mgmt_analysis = analyze_management_quality(financial_line_items)
+        mgmt_analysis = analyze_management_quality(financial_line_items, cik=cik)
 
         progress.update_status(agent_id, ticker, "Calculating intrinsic value")
-        intrinsic_value_analysis = calculate_intrinsic_value(financial_line_items)
+        intrinsic_value_analysis = calculate_intrinsic_value(financial_line_items, cik=cik)
 
         # Calculate per-share values if available
         current_price_per_share = None
@@ -218,10 +224,15 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
         analysis_details = state["data"].setdefault("analysis_details", {})
         agent_details = analysis_details.setdefault(agent_id, {})
         ticker_entry = agent_details.setdefault(ticker, {})
+        
+        # Add provenance to market cap
+        market_cap_provenance = get_market_cap_provenance(market_cap, end_date) if market_cap else None
+        
         ticker_entry["analysis_data"] = {
             "score": total_score,
             "max_score": max_possible_score,
             "market_cap": market_cap,
+            "market_cap_provenance": market_cap_provenance,
             "margin_of_safety": margin_of_safety,
             "intrinsic_value": intrinsic_value,
             "current_price_per_share": current_price_per_share,
@@ -229,6 +240,28 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
             "required_mos": required_mos,
             "required_mos_on_price_basis": required_mos_on_price_basis,
             "required_mos_buy_price_per_share": required_mos_buy_price_per_share,
+            "period_type_used": "ttm",  # Warren Buffett uses TTM
+            "data_sources": {
+                "financial_metrics": {
+                    "source": "financial_metrics_api",
+                    "period_type": "ttm",
+                    "limit": 20,
+                    "latest_report_period": metrics[0].report_period if metrics else None,
+                    "latest_fiscal_period": getattr(metrics[0], "fiscal_period", None) if metrics else None,
+                },
+                "financial_line_items": {
+                    "source": "line_items_api",
+                    "period_type": "ttm",
+                    "limit": 20,
+                    "latest_report_period": financial_line_items[0].report_period if financial_line_items else None,
+                    "latest_fiscal_period": getattr(financial_line_items[0], "fiscal_period", None) if financial_line_items else None,
+                },
+                "market_cap": {
+                    "source": "market_cap_api",
+                    "period_type": "latest",
+                    "date": end_date,
+                }
+            }
         }
         ticker_entry["analysis_details"] = structured_detail_items
 
@@ -249,7 +282,7 @@ def warren_buffett_agent(state: AgentState, agent_id: str = "warren_buffett_agen
     return {"messages": [message], "data": state["data"]}
 
 
-def analyze_fundamentals(metrics: list) -> dict[str, any]:
+def analyze_fundamentals(metrics: list, cik: Optional[str] = None) -> dict[str, any]:
     """Analyze company fundamentals based on Buffett's criteria."""
     if not metrics:
         return {"score": 0, "details": "Insufficient fundamental data"}
@@ -303,16 +336,30 @@ def analyze_fundamentals(metrics: list) -> dict[str, any]:
         "current_ratio": getattr(latest_metrics, "current_ratio", None),
         "date": _get_item_date(latest_metrics),
     }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        metrics=metrics,
+        field_mapping={
+            "return_on_equity": "return_on_equity",
+            "debt_to_equity": "debt_to_equity",
+            "operating_margin": "operating_margin",
+            "current_ratio": "current_ratio",
+        },
+        cik=cik
+    )
+    
     return {
         "score": score,
         "max_score": max_score,
         "details": "; ".join(reasoning),
         "metrics": latest_metrics.model_dump(),
-        "data": data,
+        "data": data_with_provenance,
     }
 
 
-def analyze_consistency(financial_line_items: list) -> dict[str, any]:
+def analyze_consistency(financial_line_items: list, cik: Optional[str] = None) -> dict[str, any]:
     """Analyze earnings consistency and growth."""
     if len(financial_line_items) < 4:  # Need at least 4 periods for trend analysis
         return {"score": 0, "details": "Insufficient historical data"}
@@ -340,18 +387,28 @@ def analyze_consistency(financial_line_items: list) -> dict[str, any]:
     else:
         reasoning.append("Insufficient earnings data for trend analysis")
 
+    data = {
+        "earnings_values": earnings_values,
+        "earnings_dates": earnings_dates,
+        "earnings_growth_monotonic": True if len(earnings_values) >= 2 else None,
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={"net_income": "net_income"},
+        cik=cik
+    )
+
     return {
         "score": score,
         "details": "; ".join(reasoning),
-        "data": {
-            "earnings_values": earnings_values,
-            "earnings_dates": earnings_dates,
-            "earnings_growth_monotonic": True if len(earnings_values) >= 2 else None,
-        },
+        "data": data_with_provenance,
     }
 
 
-def analyze_moat(metrics: list) -> dict[str, any]:
+def analyze_moat(metrics: list, cik: Optional[str] = None) -> dict[str, any]:
     """
     Evaluate whether the company likely has a durable competitive advantage (moat).
     Enhanced to include multiple moat indicators that Buffett actually looks for:
@@ -443,22 +500,36 @@ def analyze_moat(metrics: list) -> dict[str, any]:
     # Cap the score at max_score
     moat_score = min(moat_score, max_score)
 
+    data = {
+        "historical_roes": historical_roes,
+        "historical_margins": historical_margins if 'historical_margins' in locals() else [],
+        "asset_turnovers": asset_turnovers if 'asset_turnovers' in locals() else [],
+        "dates": [
+            _get_item_date(m) for m in metrics if hasattr(m, 'return_on_equity') or hasattr(m, 'operating_margin')
+        ],
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        metrics=metrics,
+        field_mapping={
+            "return_on_equity": "return_on_equity",
+            "operating_margin": "operating_margin",
+            "asset_turnover": "asset_turnover",
+        },
+        cik=cik
+    )
+    
     return {
         "score": moat_score,
         "max_score": max_score,
         "details": "; ".join(reasoning) if reasoning else "Limited moat analysis available",
-        "data": {
-            "historical_roes": historical_roes,
-            "historical_margins": historical_margins if 'historical_margins' in locals() else [],
-            "asset_turnovers": asset_turnovers if 'asset_turnovers' in locals() else [],
-            "dates": [
-                _get_item_date(m) for m in metrics if hasattr(m, 'return_on_equity') or hasattr(m, 'operating_margin')
-            ],
-        },
+        "data": data_with_provenance,
     }
 
 
-def analyze_management_quality(financial_line_items: list) -> dict[str, any]:
+def analyze_management_quality(financial_line_items: list, cik: Optional[str] = None) -> dict[str, any]:
     """
     Checks for share dilution or consistent buybacks, and some dividend track record.
     A simplified approach:
@@ -494,16 +565,30 @@ def analyze_management_quality(financial_line_items: list) -> dict[str, any]:
     else:
         reasoning.append("No or minimal dividends paid")
 
+    data = {
+        "issuance_or_purchase_of_equity_shares": getattr(latest, "issuance_or_purchase_of_equity_shares", None),
+        "dividends_and_other_cash_distributions": getattr(latest, "dividends_and_other_cash_distributions", None),
+        "outstanding_shares": getattr(latest, "outstanding_shares", None),
+        "date": _get_item_date(latest),
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={
+            "issuance_or_purchase_of_equity_shares": "issuance_or_purchase_of_equity_shares",
+            "dividends_and_other_cash_distributions": "dividends_and_other_cash_distributions",
+            "outstanding_shares": "outstanding_shares",
+        },
+        cik=cik
+    )
+    
     return {
         "score": mgmt_score,
         "max_score": 2,
         "details": "; ".join(reasoning),
-        "data": {
-            "issuance_or_purchase_of_equity_shares": getattr(latest, "issuance_or_purchase_of_equity_shares", None),
-            "dividends_and_other_cash_distributions": getattr(latest, "dividends_and_other_cash_distributions", None),
-            "outstanding_shares": getattr(latest, "outstanding_shares", None),
-            "date": _get_item_date(latest),
-        },
+        "data": data_with_provenance,
     }
 
 
@@ -635,7 +720,7 @@ def estimate_maintenance_capex(financial_line_items: list) -> float:
         return max(method_1, method_2)
 
 
-def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
+def calculate_intrinsic_value(financial_line_items: list, cik: Optional[str] = None) -> dict[str, any]:
     """
     Calculate intrinsic value using enhanced DCF with owner earnings.
     Uses more sophisticated assumptions and conservative approach like Buffett.
@@ -739,6 +824,28 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
         f"Discount rate: {discount_rate:.1%}"
     ])
 
+    data = {
+        "historical_earnings": historical_earnings,
+        "owner_earnings": owner_earnings,
+        "owner_earnings_components": earnings_data.get("components", {}),
+        "stage_pv": {"stage1": stage1_pv, "stage2": stage2_pv, "terminal": terminal_pv},
+        "discount_rate": discount_rate,
+        "dates": [_get_item_date(item) for item in financial_line_items[:20]],
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={
+            "net_income": "net_income",
+            "depreciation_and_amortization": "depreciation_and_amortization",
+            "capital_expenditure": "capital_expenditure",
+            "outstanding_shares": "outstanding_shares",
+        },
+        cik=cik
+    )
+    
     return {
         "intrinsic_value": conservative_intrinsic_value,
         "raw_intrinsic_value": intrinsic_value,
@@ -754,18 +861,11 @@ def calculate_intrinsic_value(financial_line_items: list) -> dict[str, any]:
         },
         "details": details,
         "intrinsic_value_per_share": intrinsic_value_per_share,
-        "data": {
-            "historical_earnings": historical_earnings,
-            "owner_earnings": owner_earnings,
-            "owner_earnings_components": earnings_data.get("components", {}),
-            "stage_pv": {"stage1": stage1_pv, "stage2": stage2_pv, "terminal": terminal_pv},
-            "discount_rate": discount_rate,
-            "dates": [_get_item_date(item) for item in financial_line_items[:20]],
-        },
+        "data": data_with_provenance,
     }
 
 
-def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
+def analyze_book_value_growth(financial_line_items: list, cik: Optional[str] = None) -> dict[str, any]:
     """Analyze book value per share growth - a key Buffett metric."""
     if len(financial_line_items) < 3:
         return {"score": 0, "details": "Insufficient data for book value analysis"}
@@ -807,14 +907,27 @@ def analyze_book_value_growth(financial_line_items: list) -> dict[str, any]:
     score += cagr_score
     reasoning.append(cagr_reason)
 
+    data = {
+        "book_values": book_values,
+        "dates": [_get_item_date(item) for item in financial_line_items],
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={
+            "shareholders_equity": "shareholders_equity",
+            "outstanding_shares": "outstanding_shares",
+        },
+        cik=cik
+    )
+    
     return {
         "score": score,
         "max_score": max_score,
         "details": "; ".join(reasoning),
-        "data": {
-            "book_values": book_values,
-            "dates": [_get_item_date(item) for item in financial_line_items],
-        },
+        "data": data_with_provenance,
     }
 
 
@@ -843,7 +956,7 @@ def _calculate_book_value_cagr(book_values: list) -> tuple[int, str]:
         return 0, "Unable to calculate meaningful book value CAGR due to negative values"
 
 
-def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str, any]:
+def analyze_pricing_power(financial_line_items: list, metrics: list, cik: Optional[str] = None) -> dict[str, any]:
     """
     Analyze pricing power - Buffett's key indicator of a business moat.
     Looks at ability to raise prices without losing customers (margin expansion during inflation).
@@ -897,14 +1010,28 @@ def analyze_pricing_power(financial_line_items: list, metrics: list) -> dict[str
             score += 1
             reasoning.append(f"Good gross margins ({avg_margin:.1%}) suggest decent pricing power")
 
+    data = {
+        "gross_margins": gross_margins,
+        "dates": [_get_item_date(item) for item in financial_line_items],
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={
+            "gross_profit": "gross_profit",
+            "revenue": "revenue",
+            "gross_margin": "gross_margin",
+        },
+        cik=cik
+    )
+    
     return {
         "score": score,
         "max_score": max_score,
         "details": "; ".join(reasoning) if reasoning else "Limited pricing power analysis available",
-        "data": {
-            "gross_margins": gross_margins,
-            "dates": [_get_item_date(item) for item in financial_line_items],
-        },
+        "data": data_with_provenance,
     }
 
 
@@ -917,6 +1044,11 @@ def generate_buffett_output(
     """Get investment decision from LLM with a compact prompt."""
 
     # --- Build compact facts here ---
+    # Format percentage values for better readability
+    margin_of_safety_raw = analysis_data.get("margin_of_safety")
+    required_mos_raw = analysis_data.get("required_mos")
+    required_mos_on_price_basis_raw = analysis_data.get("required_mos_on_price_basis")
+    
     facts = {
         "score": analysis_data.get("score"),
         "max_score": analysis_data.get("max_score"),
@@ -928,11 +1060,13 @@ def generate_buffett_output(
         "management": analysis_data.get("management_analysis", {}).get("details"),
         "intrinsic_value": analysis_data.get("intrinsic_value_analysis", {}).get("intrinsic_value"),
         "market_cap": analysis_data.get("market_cap"),
-        "margin_of_safety": analysis_data.get("margin_of_safety"),
+        "margin_of_safety": f"{margin_of_safety_raw:.1%}" if margin_of_safety_raw is not None else None,
+        "margin_of_safety_decimal": margin_of_safety_raw,  # Keep decimal for calculations
         "current_price_per_share": analysis_data.get("current_price_per_share"),
         "intrinsic_value_per_share": analysis_data.get("intrinsic_value_per_share"),
-        "required_mos": analysis_data.get("required_mos"),
-        "required_mos_on_price_basis": analysis_data.get("required_mos_on_price_basis"),
+        "required_mos": f"{required_mos_raw:.1%}" if required_mos_raw is not None else None,
+        "required_mos_decimal": required_mos_raw,  # Keep decimal for calculations
+        "required_mos_on_price_basis": f"{required_mos_on_price_basis_raw:.1%}" if required_mos_on_price_basis_raw is not None else None,
         "required_mos_buy_price_per_share": analysis_data.get("required_mos_buy_price_per_share"),
     }
 
@@ -967,11 +1101,18 @@ def generate_buffett_output(
                 "'I', 'the intrinsic value I calculate', 'my required margin of safety', etc. Never use 'your' when "
                 "referring to the analysis or calculations - this is your own work.\n"
                 "\n"
+                "When mentioning percentages (margins, margin of safety, growth rates, etc.), always format them as "
+                "percentages (e.g., '43.3%' or 'about 43%') rather than decimals (e.g., '0.433'). This makes the "
+                "analysis more readable and natural.\n"
+                "\n"
                 "Write in a natural, conversational style as if explaining your thinking to a partner. "
                 "Weave together your observations about the business, management, financials, and valuation into a "
                 "coherent narrative. Do not explicitly list categories or use phrases like 'Circle of competence:' "
                 "or 'Not clearly established from the supplied facts.' Instead, write naturally about what you observe "
                 "and how it informs your decision.\n"
+                "\n"
+                "Use simple punctuation - avoid em dashes (—) and prefer commas, periods instead. "
+                "Keep the writing clean and straightforward.\n"
                 "\n"
                 "Do not invent data. If margin of safety is less than 0, don't say it's negative. Return JSON only."
             ),
