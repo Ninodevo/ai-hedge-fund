@@ -2,8 +2,10 @@
 
 import json
 from pydantic import BaseModel
+from typing import Optional, Tuple
 from src.llm.models import get_model, get_model_info
 from src.utils.progress import progress
+from src.utils.cost_tracking import extract_token_usage_from_llm_response, calculate_llm_cost, CostTracker
 from src.graph.state import AgentState
 
 
@@ -14,6 +16,7 @@ def call_llm(
     state: AgentState | None = None,
     max_retries: int = 3,
     default_factory=None,
+    cost_tracker: Optional[CostTracker] = None,
 ) -> BaseModel:
     """
     Makes an LLM call with retry logic, handling both JSON supported and non-JSON supported models.
@@ -60,6 +63,13 @@ def call_llm(
         try:
             # Call the LLM
             result = llm.invoke(prompt)
+
+            # Track costs if cost_tracker is provided
+            if cost_tracker and agent_name:
+                token_usage = extract_token_usage_from_llm_response(result)
+                if token_usage:
+                    cost = calculate_llm_cost(token_usage, model_name, model_provider)
+                    cost_tracker.add_llm_cost(agent_name, cost, token_usage)
 
             # For non-JSON support models, we need to extract and parse the JSON manually
             if model_info and not model_info.has_json_mode():

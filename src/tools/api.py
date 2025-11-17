@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import requests
 import time
+from typing import Optional
 
 from src.data.cache import get_cache
 from src.data.models import (
@@ -23,12 +24,25 @@ from src.utils.data_freshness import (
     get_freshness_warning,
     should_fallback_to_quarterly,
 )
+from src.utils.cost_tracking import CostTracker
 
 # Global cache instance
 _cache = get_cache()
 
+# Estimated cost per Financial Datasets API call (in USD)
+# This is a placeholder - adjust based on actual pricing
+FINANCIAL_API_COST_PER_CALL = 0.001  # $0.001 per API call
 
-def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: dict = None, max_retries: int = 3) -> requests.Response:
+
+def _make_api_request(
+    url: str, 
+    headers: dict, 
+    method: str = "GET", 
+    json_data: dict = None, 
+    max_retries: int = 3,
+    cost_tracker: Optional[CostTracker] = None,
+    api_name: str = "financial_datasets_api"
+) -> requests.Response:
     """
     Make an API request with rate limiting handling and moderate backoff.
     
@@ -38,6 +52,8 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
         method: HTTP method (GET or POST)
         json_data: JSON data for POST requests
         max_retries: Maximum number of retries (default: 3)
+        cost_tracker: Optional CostTracker to track API costs
+        api_name: Name of the API for cost tracking (default: "financial_datasets_api")
     
     Returns:
         requests.Response: The response object
@@ -57,6 +73,16 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
             print(f"Rate limited (429). Attempt {attempt + 1}/{max_retries + 1}. Waiting {delay}s before retrying...")
             time.sleep(delay)
             continue
+        
+        # Track cost only on successful requests (200-299) and only count once per call
+        if cost_tracker and response.status_code >= 200 and response.status_code < 300 and attempt == 0:
+            # Determine API name from URL
+            if "financialdatasets.ai" in url:
+                api_name_for_cost = "financial_datasets_api"
+            else:
+                api_name_for_cost = api_name
+            
+            cost_tracker.add_api_cost(api_name_for_cost, FINANCIAL_API_COST_PER_CALL, call_count=1)
         
         # Return the response (whether success, other errors, or final 429)
         return response

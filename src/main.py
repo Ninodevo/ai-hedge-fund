@@ -12,6 +12,7 @@ from src.utils.display import print_trading_output
 from src.utils.analysts import ANALYST_ORDER, get_analyst_nodes
 from src.utils.progress import progress
 from src.utils.visualize import save_graph_as_png
+from src.utils.cost_tracking import CostTracker
 from src.cli.input import (
     parse_cli_inputs,
 )
@@ -56,6 +57,9 @@ def run_hedge_fund(
     # Start progress tracking
     progress.start()
 
+    # Initialize cost tracker
+    cost_tracker = CostTracker()
+
     try:
         # Build workflow (default to all analysts when none provided)
         workflow = create_workflow(selected_analysts if selected_analysts else None)
@@ -79,6 +83,7 @@ def run_hedge_fund(
                     "show_reasoning": show_reasoning,
                     "model_name": model_name,
                     "model_provider": model_provider,
+                    "cost_tracker": cost_tracker,
                 },
             },
         )
@@ -87,6 +92,7 @@ def run_hedge_fund(
             "decisions": parse_hedge_fund_response(final_state["messages"][-1].content),
             "analyst_signals": final_state["data"]["analyst_signals"],
             "analysis_details": final_state["data"]["analysis_details"],
+            "cost_summary": cost_tracker.get_summary(),
         }
     finally:
         # Stop progress tracking

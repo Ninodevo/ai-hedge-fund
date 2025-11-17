@@ -237,12 +237,35 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, pe
     summary = result.get("decisions")
     analyst_signals = result.get("analyst_signals")
     analysis_details = result.get("analysis_details")
+    cost_summary = result.get("cost_summary", {})
 
     # Fetch latest price snapshot
     price_snapshot = _get_latest_price(symbol)
 
     # Enriched fundamentals/valuation/volatility block
     enriched = collect_enriched_stock(symbol, months_back or 12, period_type=period_type)
+    
+    # Add news analysis cost to cost summary if available
+    if enriched.get("news_analysis") and enriched["news_analysis"].get("cost_usd"):
+        news_cost = enriched["news_analysis"]["cost_usd"]
+        if "llm_costs" not in cost_summary:
+            cost_summary["llm_costs"] = {"total_usd": 0.0, "by_agent": {}}
+        if "total_usd" not in cost_summary["llm_costs"]:
+            cost_summary["llm_costs"]["total_usd"] = 0.0
+        if "by_agent" not in cost_summary["llm_costs"]:
+            cost_summary["llm_costs"]["by_agent"] = {}
+        
+        cost_summary["llm_costs"]["total_usd"] = round(
+            cost_summary["llm_costs"].get("total_usd", 0.0) + news_cost, 6
+        )
+        cost_summary["llm_costs"]["by_agent"]["news_analysis"] = news_cost
+        
+        # Update total cost
+        if "total_cost_usd" not in cost_summary:
+            cost_summary["total_cost_usd"] = 0.0
+        cost_summary["total_cost_usd"] = round(
+            cost_summary["total_cost_usd"] + news_cost, 6
+        )
     
     # Add price data to provenance if available
     if price_snapshot and "data_provenance" in enriched:
@@ -267,6 +290,7 @@ def _build_report(symbol: str, persona: str, months_back: Optional[int] = 12, pe
         "analyst_signals": analyst_signals,
         "analysis_details": analysis_details,
         "enriched": enriched,
+        "cost_summary": cost_summary,
         "backtest": None,
         "disclaimer": (
             "AI-generated content for educational and informational purposes only. "

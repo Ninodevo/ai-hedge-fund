@@ -394,12 +394,13 @@ def _parse_analysis_by_category(analysis_text: str) -> Dict[str, Dict[str, Any]]
         return {}
     
     # Category mapping from numbers/names to standardized keys
+    # Patterns match categories with or without number prefixes, and handle parenthetical text
     category_patterns = [
-        (r"^1\.?\s*(?:relevant\s+news|relevant\s+news\s+and\s+their\s+implications)", "relevant_news"),
-        (r"^2\.?\s*(?:financial\s+moves)", "financial_moves"),
-        (r"^3\.?\s*(?:upcoming\s+events)", "upcoming_events"),
-        (r"^4\.?\s*(?:short[- ]term\s+outlook)", "short_term_outlook"),
-        (r"^5\.?\s*(?:long[- ]term\s+outlook)", "long_term_outlook"),
+        (r"^(?:\d+\.?\s*)?relevant\s+news(?:\s+and\s+their\s+implications)?", "relevant_news"),
+        (r"^(?:\d+\.?\s*)?financial\s+moves", "financial_moves"),
+        (r"^(?:\d+\.?\s*)?upcoming\s+events", "upcoming_events"),
+        (r"^(?:\d+\.?\s*)?short[- ]term\s+outlook", "short_term_outlook"),
+        (r"^(?:\d+\.?\s*)?long[- ]term\s+outlook", "long_term_outlook"),
     ]
     
     # Category display names
@@ -426,9 +427,11 @@ def _parse_analysis_by_category(analysis_text: str) -> Dict[str, Dict[str, Any]]
         # Check if this line starts a new category
         category_found = False
         line_lower = line.lower()
+        # Remove parenthetical text for matching (e.g., "Financial moves (acquisitions...)" -> "Financial moves")
+        line_for_matching = re.sub(r'\s*\([^)]*\).*$', '', line_lower).strip()
         
         for pattern, cat_key in category_patterns:
-            if re.match(pattern, line_lower):
+            if re.match(pattern, line_for_matching):
                 # Save previous category if exists
                 if current_category and current_bullets:
                     result[current_category] = {
@@ -709,10 +712,10 @@ def _analyze_news_with_llm(
                             # Tavily search with max_results and search_depth
                             response = tavily_client.search(
                                 query=query,
-                                max_results=10,
+                                max_results=5,
                                 search_depth="advanced",  # "basic" or "advanced"
                                 include_domains=None,  # Can specify domains to include
-                                exclude_domains=["yahoo.com", "finance.yahoo.com"]  # Exclude Yahoo
+                                exclude_domains=[]  # Exclude Yahoo
                             )
                             
                             results = response.get("results", [])
