@@ -1,19 +1,30 @@
 from src.graph.state import AgentState, show_agent_reasoning
-from src.tools.api import get_financial_metrics, get_market_cap, search_line_items
+from src.tools.api import get_financial_metrics, get_market_cap, search_line_items, get_company_facts
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 import json
+from typing import Optional
 from typing_extensions import Literal
 from src.utils.progress import progress
 from src.utils.llm import call_llm
 from src.utils.api_key import get_api_key_from_state
+from src.utils.analyst_provenance import add_provenance_to_data, get_market_cap_provenance
 
 
 class CathieWoodSignal(BaseModel):
     signal: Literal["bullish", "bearish", "neutral"]
     confidence: float
     reasoning: str
+
+
+def _get_item_date(obj):
+    # Prefer concrete report dates over generic period labels like 'ttm'
+    for attr in ("date", "report_period", "period_end", "end_date", "as_of_date", "fiscal_date", "report_date"):
+        val = getattr(obj, attr, None)
+        if val:
+            return val
+    return None
 
 
 def cathie_wood_agent(state: AgentState, agent_id: str = "cathie_wood_agent"):
@@ -61,15 +72,19 @@ def cathie_wood_agent(state: AgentState, agent_id: str = "cathie_wood_agent"):
 
         progress.update_status(agent_id, ticker, "Getting market cap")
         market_cap = get_market_cap(ticker, end_date, api_key=api_key)
+        
+        # Get CIK for provenance tracking
+        company_facts_obj = get_company_facts(ticker)
+        cik = getattr(company_facts_obj, "cik", None) if company_facts_obj else None
 
         progress.update_status(agent_id, ticker, "Analyzing disruptive potential")
-        disruptive_analysis = analyze_disruptive_potential(metrics, financial_line_items)
+        disruptive_analysis = analyze_disruptive_potential(metrics, financial_line_items, cik=cik)
 
         progress.update_status(agent_id, ticker, "Analyzing innovation-driven growth")
-        innovation_analysis = analyze_innovation_growth(metrics, financial_line_items)
+        innovation_analysis = analyze_innovation_growth(metrics, financial_line_items, cik=cik)
 
         progress.update_status(agent_id, ticker, "Calculating valuation & high-growth scenario")
-        valuation_analysis = analyze_cathie_wood_valuation(financial_line_items, market_cap)
+        valuation_analysis = analyze_cathie_wood_valuation(financial_line_items, market_cap, cik=cik)
 
         # Combine partial scores or signals
         total_score = disruptive_analysis["score"] + innovation_analysis["score"] + valuation_analysis["score"]
@@ -94,24 +109,89 @@ def cathie_wood_agent(state: AgentState, agent_id: str = "cathie_wood_agent"):
 
         cw_analysis[ticker] = {"signal": cw_output.signal, "confidence": cw_output.confidence, "reasoning": cw_output.reasoning}
 
-        progress.update_status(agent_id, ticker, "Done", analysis=cw_output.reasoning)
-
-        # Persist structured analysis details per ticker for UI/debugging
-        def _split_details_to_list(val):
-            items = []
-            if not val:
-                return items
-            return [p.strip() for p in str(val).replace("\n", ";").split(";") if p and p.strip()]
-
-        structured_detail_items = [
-            {"label": "disruptive_potential", "detail": _split_details_to_list(disruptive_analysis.get("details"))},
-            {"label": "innovation_growth", "detail": _split_details_to_list(innovation_analysis.get("details"))},
-            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details"))},
-        ]
-
+        # Persist detailed reasoning text per ticker for debugging/UX (safe-init)
         analysis_details = state["data"].setdefault("analysis_details", {})
         agent_details = analysis_details.setdefault(agent_id, {})
-        agent_details[ticker] = structured_detail_items
+        ticker_entry = agent_details.setdefault(ticker, {})
+        
+        # Add provenance to market cap
+        market_cap_provenance = get_market_cap_provenance(market_cap, end_date) if market_cap else None
+        
+        # Calculate per-share values if available
+        current_price_per_share = None
+        intrinsic_value_per_share = None
+        try:
+            shares_outstanding_ps = getattr(financial_line_items[0], 'outstanding_shares', None) if financial_line_items else None
+            if market_cap and shares_outstanding_ps:
+                current_price_per_share = market_cap / shares_outstanding_ps
+            if valuation_analysis.get("intrinsic_value") and shares_outstanding_ps:
+                intrinsic_value_per_share = valuation_analysis["intrinsic_value"] / shares_outstanding_ps
+        except Exception:
+            pass
+        
+        ticker_entry["analysis_data"] = {
+            "score": total_score,
+            "max_score": max_possible_score,
+            "market_cap": market_cap,
+            "market_cap_provenance": market_cap_provenance,
+            "margin_of_safety": valuation_analysis.get("margin_of_safety"),
+            "intrinsic_value": valuation_analysis.get("intrinsic_value"),
+            "current_price_per_share": current_price_per_share,
+            "intrinsic_value_per_share": intrinsic_value_per_share,
+            "period_type_used": "annual",  # Cathie Wood uses annual data
+            "data_sources": {
+                "financial_metrics": {
+                    "source": "financial_metrics_api",
+                    "period_type": "annual",
+                    "limit": 5,
+                    "latest_report_period": metrics[0].report_period if metrics else None,
+                    "latest_fiscal_period": getattr(metrics[0], "fiscal_period", None) if metrics else None,
+                },
+                "financial_line_items": {
+                    "source": "line_items_api",
+                    "period_type": "annual",
+                    "limit": 5,
+                    "latest_report_period": financial_line_items[0].report_period if financial_line_items else None,
+                    "latest_fiscal_period": getattr(financial_line_items[0], "fiscal_period", None) if financial_line_items else None,
+                },
+                "market_cap": {
+                    "source": "market_cap_api",
+                    "period_type": "latest",
+                    "date": end_date,
+                }
+            }
+        }
+        
+        # Persist structured analysis details per ticker for UI/debugging
+        def _split_details_to_list(val):
+            """Normalize details into a list of strings, splitting on ';' and trimming."""
+            items: list[str] = []
+            if val is None:
+                return items
+            if isinstance(val, list):
+                for v in val:
+                    if v is None:
+                        continue
+                    if isinstance(v, str):
+                        parts = [p.strip() for p in v.split(";")]
+                        items.extend([p for p in parts if p])
+                    else:
+                        items.append(str(v))
+                return items
+            # string or other primitive
+            s = str(val)
+            parts = [p.strip() for p in s.split(";")]
+            return [p for p in parts if p]
+
+        structured_detail_items = [
+            {"label": "disruptive_potential", "detail": _split_details_to_list(disruptive_analysis.get("details")), "data": disruptive_analysis.get("data"), "score": disruptive_analysis["score"], "max_score": disruptive_analysis.get("max_score", 5)},
+            {"label": "innovation_growth", "detail": _split_details_to_list(innovation_analysis.get("details")), "data": innovation_analysis.get("data"), "score": innovation_analysis["score"], "max_score": innovation_analysis.get("max_score", 5)},
+            {"label": "valuation", "detail": _split_details_to_list(valuation_analysis.get("details")), "data": valuation_analysis.get("data"), "score": valuation_analysis["score"], "max_score": valuation_analysis.get("max_score", 3)},
+        ]
+        
+        ticker_entry["analysis_details"] = structured_detail_items
+        
+        progress.update_status(agent_id, ticker, "Done", analysis=cw_output.reasoning)
 
     message = HumanMessage(content=json.dumps(cw_analysis), name=agent_id)
 
@@ -125,7 +205,7 @@ def cathie_wood_agent(state: AgentState, agent_id: str = "cathie_wood_agent"):
     return {"messages": [message], "data": state["data"]}
 
 
-def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> dict:
+def analyze_disruptive_potential(metrics: list, financial_line_items: list, cik: Optional[str] = None) -> dict:
     """
     Analyze whether the company has disruptive products, technology, or business model.
     Evaluates multiple dimensions of disruptive potential:
@@ -137,14 +217,20 @@ def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> d
     """
     score = 0
     details = []
+    max_possible_score = 12  # Sum of all possible points
 
     if not metrics or not financial_line_items:
-        return {"score": 0, "details": "Insufficient data to analyze disruptive potential"}
+        return {"score": 0, "max_score": max_possible_score, "details": "Insufficient data to analyze disruptive potential"}
 
+    # Initialize variables
+    revenues = []
+    growth_rates = []
+    gross_margins = []
+    operating_expenses = []
+    rd_expenses = []
+    
     # 1. Revenue Growth Analysis - Check for accelerating growth
-    revenues = [item.revenue for item in financial_line_items if item.revenue]
     if len(revenues) >= 3:  # Need at least 3 periods to check acceleration
-        growth_rates = []
         for i in range(len(revenues) - 1):
             if revenues[i] and revenues[i + 1]:
                 growth_rate = (revenues[i] - revenues[i + 1]) / abs(revenues[i + 1]) if revenues[i + 1] != 0 else 0
@@ -188,7 +274,6 @@ def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> d
         details.append("Insufficient gross margin data")
 
     # 3. Operating Leverage Analysis
-    revenues = [item.revenue for item in financial_line_items if item.revenue]
     operating_expenses = [item.operating_expense for item in financial_line_items if hasattr(item, "operating_expense") and item.operating_expense]
 
     if len(revenues) >= 2 and len(operating_expenses) >= 2:
@@ -218,13 +303,45 @@ def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> d
         details.append("No R&D data available")
 
     # Normalize score to be out of 5
-    max_possible_score = 12  # Sum of all possible points
-    normalized_score = (score / max_possible_score) * 5
+    normalized_score = (score / max_possible_score) * 5 if max_possible_score > 0 else 0
 
-    return {"score": normalized_score, "details": "; ".join(details), "raw_score": score, "max_score": max_possible_score}
+    latest = financial_line_items[0] if financial_line_items else None
+    
+    data = {
+        "revenues": revenues,
+        "growth_rates": growth_rates,
+        "gross_margins": gross_margins,
+        "operating_expenses": operating_expenses,
+        "rd_expenses": rd_expenses,
+        "rd_intensity": rd_expenses[0] / revenues[0] if rd_expenses and revenues and revenues[0] > 0 else None,
+        "date": _get_item_date(latest) if latest else None,
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        metrics=metrics,
+        line_items=financial_line_items,
+        field_mapping={
+            "revenue": "revenue",
+            "gross_margin": "gross_margin",
+            "operating_expense": "operating_expense",
+            "research_and_development": "research_and_development",
+        },
+        cik=cik
+    )
+
+    return {
+        "score": normalized_score,
+        "max_score": 5,  # Normalized score is out of 5
+        "details": "; ".join(details),
+        "raw_score": score,
+        "raw_max_score": max_possible_score,
+        "data": data_with_provenance,
+    }
 
 
-def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict:
+def analyze_innovation_growth(metrics: list, financial_line_items: list, cik: Optional[str] = None) -> dict:
     """
     Evaluate the company's commitment to innovation and potential for exponential growth.
     Analyzes multiple dimensions:
@@ -236,9 +353,22 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     """
     score = 0
     details = []
+    max_possible_score = 15  # Sum of all possible points
 
     if not metrics or not financial_line_items:
-        return {"score": 0, "details": "Insufficient data to analyze innovation-driven growth"}
+        return {"score": 0, "max_score": 5, "details": "Insufficient data to analyze innovation-driven growth"}
+
+    # Initialize variables
+    rd_expenses = []
+    revenues = []
+    rd_growth = None
+    fcf_vals = []
+    fcf_growth = None
+    op_margin_vals = []
+    capex = []
+    capex_intensity = None
+    dividends = []
+    latest_payout_ratio = None
 
     # 1. R&D Investment Trends
     rd_expenses = [item.research_and_development for item in financial_line_items if hasattr(item, "research_and_development") and item.research_and_development]
@@ -326,13 +456,49 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
         details.append("Insufficient dividend data")
 
     # Normalize score to be out of 5
-    max_possible_score = 15  # Sum of all possible points
-    normalized_score = (score / max_possible_score) * 5
+    normalized_score = (score / max_possible_score) * 5 if max_possible_score > 0 else 0
 
-    return {"score": normalized_score, "details": "; ".join(details), "raw_score": score, "max_score": max_possible_score}
+    latest = financial_line_items[0] if financial_line_items else None
+    
+    data = {
+        "rd_expenses": rd_expenses,
+        "rd_growth": rd_growth,
+        "fcf_vals": fcf_vals,
+        "fcf_growth": fcf_growth,
+        "op_margin_vals": op_margin_vals,
+        "capex": capex,
+        "capex_intensity": capex_intensity,
+        "dividends": dividends,
+        "payout_ratio": latest_payout_ratio,
+        "date": _get_item_date(latest) if latest else None,
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        metrics=metrics,
+        line_items=financial_line_items,
+        field_mapping={
+            "research_and_development": "research_and_development",
+            "free_cash_flow": "free_cash_flow",
+            "operating_margin": "operating_margin",
+            "capital_expenditure": "capital_expenditure",
+            "dividends_and_other_cash_distributions": "dividends_and_other_cash_distributions",
+        },
+        cik=cik
+    )
+
+    return {
+        "score": normalized_score,
+        "max_score": 5,  # Normalized score is out of 5
+        "details": "; ".join(details),
+        "raw_score": score,
+        "raw_max_score": max_possible_score,
+        "data": data_with_provenance,
+    }
 
 
-def analyze_cathie_wood_valuation(financial_line_items: list, market_cap: float) -> dict:
+def analyze_cathie_wood_valuation(financial_line_items: list, market_cap: float, cik: Optional[str] = None) -> dict:
     """
     Cathie Wood often focuses on long-term exponential growth potential. We can do
     a simplified approach looking for a large total addressable market (TAM) and the
@@ -374,7 +540,43 @@ def analyze_cathie_wood_valuation(financial_line_items: list, market_cap: float)
 
     details = [f"Calculated intrinsic value: ~{intrinsic_value:,.2f}", f"Market cap: ~{market_cap:,.2f}", f"Margin of safety: {margin_of_safety:.2%}"]
 
-    return {"score": score, "details": "; ".join(details), "intrinsic_value": intrinsic_value, "margin_of_safety": margin_of_safety}
+    max_score = 3
+    
+    data = {
+        "free_cash_flow": fcf,
+        "intrinsic_value": intrinsic_value,
+        "margin_of_safety": margin_of_safety,
+        "assumptions": {
+            "growth_rate": growth_rate,
+            "discount_rate": discount_rate,
+            "terminal_multiple": terminal_multiple,
+            "projection_years": projection_years,
+        },
+        "dcf_components": {
+            "present_value": present_value,
+            "terminal_value": terminal_value,
+        },
+        "date": _get_item_date(latest),
+    }
+    
+    # Add provenance information
+    data_with_provenance = add_provenance_to_data(
+        data,
+        line_items=financial_line_items,
+        field_mapping={
+            "free_cash_flow": "free_cash_flow",
+        },
+        cik=cik
+    )
+
+    return {
+        "score": score,
+        "max_score": max_score,
+        "details": "; ".join(details),
+        "intrinsic_value": intrinsic_value,
+        "margin_of_safety": margin_of_safety,
+        "data": data_with_provenance,
+    }
 
 
 def generate_cathie_wood_output(
@@ -425,6 +627,26 @@ def generate_cathie_wood_output(
             Analysis Data for {ticker}:
             {analysis_data}
 
+            Write your reasoning in first person, as if you are Cathie Wood analyzing this stock yourself. "
+            "Refer to the intrinsic value, margin of safety, and required buffer as your own analysis - use 'my', "
+            "'I', 'the intrinsic value I calculate', 'my required margin of safety', etc. Never use 'your' when "
+            "referring to the analysis or calculations - this is your own work.\n"
+            "\n"
+            "When mentioning percentages (margins, margin of safety, growth rates, etc.), always format them as "
+            "percentages (e.g., '43.3%' or 'about 43%') rather than decimals (e.g., '0.433'). This makes the "
+            "analysis more readable and natural.\n"
+            "\n"
+            "Write in a natural, conversational style as if explaining your thinking to a partner. "
+            "Weave together your observations about the business, management, financials, and valuation into a "
+            "coherent narrative. Do not explicitly list categories or use phrases like 'Circle of competence:' "
+            "or 'Not clearly established from the supplied facts.' Instead, write naturally about what you observe "
+            "and how it informs your decision.\n"
+            "\n"
+            "Use simple punctuation - avoid em dashes (—) and prefer commas, periods instead. "
+            "Keep the writing clean and straightforward.\n"
+            "\n"
+            "Do not invent data. If margin of safety is less than 0, don't say it's negative.
+
             Return the trading signal in this JSON format:
             {{
               "signal": "bullish/bearish/neutral",
@@ -441,12 +663,16 @@ def generate_cathie_wood_output(
     def create_default_cathie_wood_signal():
         return CathieWoodSignal(signal="neutral", confidence=0.0, reasoning="Error in analysis, defaulting to neutral")
 
+    # Get cost tracker from state if available
+    cost_tracker = state.get("metadata", {}).get("cost_tracker")
+
     return call_llm(
         prompt=prompt,
         pydantic_model=CathieWoodSignal,
         agent_name=agent_id,
         state=state,
         default_factory=create_default_cathie_wood_signal,
+        cost_tracker=cost_tracker,
     )
 
 
