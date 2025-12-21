@@ -64,6 +64,31 @@ class Portfolio:
             "realized_gains": gains_copy,
         }
 
+    def restore_from_snapshot(self, snapshot: PortfolioSnapshot) -> None:
+        """Restore portfolio state from a snapshot"""
+        self._portfolio["cash"] = float(snapshot["cash"])
+        self._portfolio["margin_used"] = float(snapshot["margin_used"])
+        self._portfolio["margin_requirement"] = float(snapshot["margin_requirement"])
+        
+        # Restore positions
+        for ticker, position in snapshot["positions"].items():
+            if ticker in self._portfolio["positions"]:
+                self._portfolio["positions"][ticker] = {
+                    "long": position["long"],
+                    "short": position["short"],
+                    "long_cost_basis": position["long_cost_basis"],
+                    "short_cost_basis": position["short_cost_basis"],
+                    "short_margin_used": position["short_margin_used"],
+                }
+        
+        # Restore realized gains
+        for ticker, gains in snapshot["realized_gains"].items():
+            if ticker in self._portfolio["realized_gains"]:
+                self._portfolio["realized_gains"][ticker] = {
+                    "long": gains["long"],
+                    "short": gains["short"],
+                }
+
     def get_cash(self) -> float:
         return float(self._portfolio["cash"])
 

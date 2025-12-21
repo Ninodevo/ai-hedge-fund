@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON, ForeignKey, Float
 from sqlalchemy.sql import func
 from .connection import Base
 
@@ -112,4 +112,61 @@ class ApiKey(Base):
     last_used = Column(DateTime(timezone=True), nullable=True)  # Track usage
 
 
- 
+class AnalystComparison(Base):
+    """Store analyst comparison results from backtesting"""
+    __tablename__ = "analyst_comparisons"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Test configuration
+    ticker = Column(String(10), nullable=False, index=True)
+    analyst_name = Column(String(100), nullable=False, index=True)
+    start_date = Column(String(20), nullable=False)
+    end_date = Column(String(20), nullable=False)
+    model_name = Column(String(100), nullable=False)
+    model_provider = Column(String(50), nullable=False)
+    initial_capital = Column(Float, nullable=False, default=100000.0)
+    
+    # Performance metrics
+    total_return = Column(Float, nullable=True)  # Percentage return
+    total_return_absolute = Column(Float, nullable=True)  # Dollar return
+    final_value = Column(Float, nullable=True)
+    sharpe_ratio = Column(Float, nullable=True)
+    sortino_ratio = Column(Float, nullable=True)
+    max_drawdown = Column(Float, nullable=True)  # Percentage
+    max_drawdown_date = Column(String(20), nullable=True)
+    
+    # Exposure metrics
+    avg_long_exposure = Column(Float, nullable=True)
+    avg_short_exposure = Column(Float, nullable=True)
+    avg_gross_exposure = Column(Float, nullable=True)
+    avg_net_exposure = Column(Float, nullable=True)
+    avg_long_short_ratio = Column(Float, nullable=True)
+    
+    # Trading activity
+    total_trades = Column(Integer, nullable=True)
+    buy_trades = Column(Integer, nullable=True)
+    sell_trades = Column(Integer, nullable=True)
+    short_trades = Column(Integer, nullable=True)
+    cover_trades = Column(Integer, nullable=True)
+    
+    # File paths (references to JSON/CSV files)
+    results_json_path = Column(String(500), nullable=True)
+    results_csv_path = Column(String(500), nullable=True)
+    portfolio_values_json_path = Column(String(500), nullable=True)
+    
+    # Execution metadata
+    test_duration_seconds = Column(Float, nullable=True)
+    estimated_cost = Column(Float, nullable=True)
+    total_business_days = Column(Integer, nullable=True)
+    
+    # Additional metadata
+    notes = Column(Text, nullable=True)
+    tags = Column(JSON, nullable=True)  # For categorization
+    
+    # Unique constraint to prevent duplicates
+    __table_args__ = (
+        {'sqlite_autoincrement': True},
+    )

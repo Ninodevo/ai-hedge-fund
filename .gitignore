@@ -65,6 +65,12 @@ outputs/
 *.sqlite
 *.sqlite3
 
+# Backtest results (large files - keep structure, ignore data)
+data/backtests/results/
+data/backtests/analyst_comparisons.db
+data/backtests/comparisons/*.json
+!data/backtests/comparisons/.gitkeep
+
 # Alembic (keep migration files, but ignore generated/cache files)
 app/backend/alembic/versions/__pycache__/
 

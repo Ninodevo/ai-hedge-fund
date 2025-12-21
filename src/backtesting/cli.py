@@ -140,7 +140,25 @@ def main() -> int:
         initial_margin_requirement=args.margin_requirement,
     )
 
-    metrics = engine.run_backtest()
+    # Extract ticker and analyst for checkpointing (use first if multiple)
+    checkpoint_ticker = tickers[0] if len(tickers) == 1 and tickers else None
+    checkpoint_analyst = selected_analysts[0] if len(selected_analysts) == 1 and selected_analysts else None
+    
+    # Setup CSV path for streaming if single ticker/analyst
+    csv_path = None
+    if checkpoint_ticker and checkpoint_analyst:
+        from pathlib import Path
+        csv_dir = Path("data/backtests/results") / checkpoint_ticker
+        csv_dir.mkdir(parents=True, exist_ok=True)
+        date_range = f"{args.start_date}_{args.end_date}"
+        csv_path = csv_dir / f"{checkpoint_analyst}_{date_range}_streaming.csv"
+
+    metrics = engine.run_backtest(
+        ticker=checkpoint_ticker,
+        analyst=checkpoint_analyst,
+        csv_path=csv_path,
+        resume=True,
+    )
     values = engine.get_portfolio_values()
 
     # Minimal terminal output (no plots)
